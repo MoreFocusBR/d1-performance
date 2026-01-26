@@ -1,5 +1,5 @@
 import { query } from '../utils/db';
-import { hashPhone, encryptPhone, normalizePhone } from '../utils/crypto';
+import { hashPhone, encryptPhone, normalizePhone, decryptPhone } from '../utils/crypto';
 
 export interface Lead {
   id: string;
@@ -16,6 +16,19 @@ export interface Lead {
   user_agent?: string;
   created_at: string;
   status: string;
+}
+
+// Helper function to decrypt lead data
+function decryptLeadData(lead: any): Lead {
+  try {
+    return {
+      ...lead,
+      telefone: lead.telefone ? decryptPhone(lead.telefone) : lead.telefone
+    };
+  } catch (error) {
+    console.error('Error decrypting lead data:', error);
+    return lead;
+  }
 }
 
 export class LeadModel {
@@ -57,7 +70,7 @@ export class LeadModel {
       ]
     );
 
-    return result.rows[0];
+    return decryptLeadData(result.rows[0]);
   }
 
   static async findByPhoneHash(phoneHash: string): Promise<Lead | null> {
@@ -66,7 +79,7 @@ export class LeadModel {
       [phoneHash]
     );
 
-    return result.rows[0] || null;
+    return result.rows[0] ? decryptLeadData(result.rows[0]) : null;
   }
 
   static async findById(id: string): Promise<Lead | null> {
@@ -75,7 +88,7 @@ export class LeadModel {
       [id]
     );
 
-    return result.rows[0] || null;
+    return result.rows[0] ? decryptLeadData(result.rows[0]) : null;
   }
 
   static async updateStatus(id: string, status: string): Promise<Lead> {
@@ -84,7 +97,7 @@ export class LeadModel {
       [status, id]
     );
 
-    return result.rows[0];
+    return decryptLeadData(result.rows[0]);
   }
 
   static async findByStatus(options: { status: string; limit: number; offset: number }): Promise<Lead[]> {
@@ -96,7 +109,7 @@ export class LeadModel {
       [options.status, options.limit, options.offset]
     );
 
-    return result.rows;
+    return result.rows.map(decryptLeadData);
   }
 
   static async findExpiredLeads(days: number = 90): Promise<Lead[]> {
@@ -107,7 +120,7 @@ export class LeadModel {
       []
     );
 
-    return result.rows;
+    return result.rows.map(decryptLeadData);
   }
 
   static async expireLeads(days: number = 90): Promise<number> {
