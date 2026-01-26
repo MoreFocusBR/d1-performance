@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Painel administrativo - Ads Conversion Tracker">
+    <title>Admin - Ads Conversion Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .subtext {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f9f9f9;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge.novo {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge.convertido {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge.expirado {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .badge.enviado {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .badge.nao-enviado {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filters select,
+        .filters input {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .filters button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .filters button:hover {
+            background: #764ba2;
+        }
+
+        .currency {
+            color: #388e3c;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+
+            .filters {
+                flex-direction: column;
+            }
+
+            .filters select,
+            .filters input,
+            .filters button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Ads Conversion Tracker</h1>
+        <p>Painel de Administração</p>
+    </div>
+
+    <div class="container">
+        <div id="message"></div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Carregando estatísticas...</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Conversões Recentes</h2>
+            
+            <div class="filters">
+                <select id="daysFilter">
+                    <option value="7">Últimos 7 dias</option>
+                    <option value="30" selected>Últimos 30 dias</option>
+                    <option value="90">Últimos 90 dias</option>
+                </select>
+                <button onclick="loadStats()">Atualizar</button>
+            </div>
+
+            <div id="conversionsTable">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Carregando conversões...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Leads Pendentes</h2>
+            <div id="leadsTable">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Carregando leads...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        async function loadStats() {
+            try {
+                const days = document.getElementById('daysFilter').value;
+                const response = await fetch(`/health/stats?days=${days}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showMessage('Erro ao carregar estatísticas', 'error');
+                    return;
+                }
+
+                const stats = data.stats;
+                const statsGrid = document.getElementById('statsGrid');
+                
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <h3>Total de Conversões</h3>
+                        <div class="value">${stats.total_conversoes || 0}</div>
+                        <div class="subtext">nos últimos ${days} dias</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Valor Total</h3>
+                        <div class="value currency">R$ ${parseFloat(stats.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        <div class="subtext">em vendas</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Ticket Médio</h3>
+                        <div class="value currency">R$ ${parseFloat(stats.valor_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        <div class="subtext">por conversão</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Enviadas para Google</h3>
+                        <div class="value">${stats.google_enviadas || 0}</div>
+                        <div class="subtext">${stats.total_conversoes > 0 ? Math.round((stats.google_enviadas / stats.total_conversoes) * 100) : 0}% do total</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Enviadas para Meta</h3>
+                        <div class="value">${stats.meta_enviadas || 0}</div>
+                        <div class="subtext">${stats.total_conversoes > 0 ? Math.round((stats.meta_enviadas / stats.total_conversoes) * 100) : 0}% do total</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                showMessage('Erro ao carregar estatísticas', 'error');
+            }
+        }
+
+        async function loadConversions() {
+            try {
+                const response = await fetch(`${API_BASE}/conversions`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showMessage('Erro ao carregar conversões', 'error');
+                    return;
+                }
+
+                const conversionsTable = document.getElementById('conversionsTable');
+                
+                if (!data.conversions || data.conversions.length === 0) {
+                    conversionsTable.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhuma conversão encontrada</p>';
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código da Venda</th>
+                                <th>Valor</th>
+                                <th>Campanha</th>
+                                <th>Google Ads</th>
+                                <th>Meta Ads</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.conversions.forEach(conv => {
+                    const date = new Date(conv.created_at).toLocaleDateString('pt-BR');
+                    const valor = parseFloat(conv.valor_venda).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                    const campaign = conv.lead?.utm_campaign || '-';
+                    const googleBadge = conv.google_ads_enviado ? 
+                        '<span class="badge enviado">✓ Enviado</span>' : 
+                        '<span class="badge nao-enviado">✗ Pendente</span>';
+                    const metaBadge = conv.meta_ads_enviado ? 
+                        '<span class="badge enviado">✓ Enviado</span>' : 
+                        '<span class="badge nao-enviado">✗ Pendente</span>';
+
+                    html += `
+                        <tr>
+                            <td><strong>${conv.codigo_venda}</strong></td>
+                            <td class="currency">R$ ${valor}</td>
+                            <td>${campaign}</td>
+                            <td>${googleBadge}</td>
+                            <td>${metaBadge}</td>
+                            <td>${date}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                conversionsTable.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading conversions:', error);
+                showMessage('Erro ao carregar conversões', 'error');
+            }
+        }
+
+        async function loadLeads() {
+            try {
+                const response = await fetch(`${API_BASE}/leads?status=novo&limit=50`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showMessage('Erro ao carregar leads', 'error');
+                    return;
+                }
+
+                const leadsTable = document.getElementById('leadsTable');
+                
+                if (!data.leads || data.leads.length === 0) {
+                    leadsTable.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhum lead pendente encontrado</p>';
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Telefone</th>
+                                <th>Campanha</th>
+                                <th>Origem</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.leads.forEach(lead => {
+                    const date = new Date(lead.created_at).toLocaleDateString('pt-BR');
+                    const campaign = lead.utm_campaign || '-';
+                    const source = lead.utm_source || '-';
+                    const statusBadge = `<span class="badge ${lead.status}">${lead.status}</span>`;
+                    const phone = lead.telefone ? lead.telefone.substring(0, 3) + '****' + lead.telefone.substring(lead.telefone.length - 2) : '***';
+
+                    html += `
+                        <tr>
+                            <td><strong>${phone}</strong></td>
+                            <td>${campaign}</td>
+                            <td>${source}</td>
+                            <td>${statusBadge}</td>
+                            <td>${date}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                leadsTable.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading leads:', error);
+                showMessage('Erro ao carregar leads', 'error');
+            }
+        }
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = text;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadConversions();
+            loadLeads();
+
+            // Refresh stats when filter changes
+            document.getElementById('daysFilter').addEventListener('change', loadStats);
+
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                loadStats();
+                loadConversions();
+                loadLeads();
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
