@@ -1,0 +1,23 @@
+{
+  "name": "ads-conversion-tracker",
+  "version": "1.0.0",
+  "description": "Sistema de rastreamento de conversões de campanhas de ads via WhatsApp",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "build": "bun build src/server.ts --outdir dist",
+    "start": "bun dist/server.js",
+    "db:migrate": "bun run scripts/migrate.ts",
+    "db:seed": "bun run scripts/seed.ts"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "pg": "^8.11.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.3.3"
+  }
+}
