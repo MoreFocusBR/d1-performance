@@ -56,6 +56,28 @@ app.get('/', async (c) => {
   }
 });
 
+// Admin route - serve admin panel
+app.get('/admin', async (c) => {
+  try {
+    const file = Bun.file('./public/admin.html');
+    const html = await file.text();
+    return c.html(html);
+  } catch (error) {
+    return c.html('<h1>Admin Panel - Coming Soon</h1>');
+  }
+});
+
+// Alternative admin route
+app.get('/admin.html', async (c) => {
+  try {
+    const file = Bun.file('./public/admin.html');
+    const html = await file.text();
+    return c.html(html);
+  } catch (error) {
+    return c.html('<h1>Admin Panel - Coming Soon</h1>');
+  }
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json({ error: 'Not found' }, 404);
