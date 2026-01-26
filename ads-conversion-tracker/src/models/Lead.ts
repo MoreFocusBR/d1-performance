@@ -87,6 +87,18 @@ export class LeadModel {
     return result.rows[0];
   }
 
+  static async findByStatus(options: { status: string; limit: number; offset: number }): Promise<Lead[]> {
+    const result = await query<Lead>(
+      `SELECT * FROM leads 
+       WHERE status = $1 
+       ORDER BY created_at DESC 
+       LIMIT $2 OFFSET $3`,
+      [options.status, options.limit, options.offset]
+    );
+
+    return result.rows;
+  }
+
   static async findExpiredLeads(days: number = 90): Promise<Lead[]> {
     const result = await query<Lead>(
       `SELECT * FROM leads 

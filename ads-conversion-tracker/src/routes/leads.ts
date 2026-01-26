@@ -42,6 +42,26 @@ app.post('/', async (c) => {
   }
 });
 
+// GET /api/leads - Get all pending leads
+app.get('/', async (c) => {
+  try {
+    const status = c.req.query('status') || 'novo';
+    const limit = parseInt(c.req.query('limit') || '100');
+    const offset = parseInt(c.req.query('offset') || '0');
+
+    const leads = await LeadService.getAllLeads({
+      status,
+      limit,
+      offset
+    });
+
+    return c.json({ success: true, leads });
+  } catch (error) {
+    console.error('Error in GET /leads:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // GET /api/leads/:phone - Get lead by phone
 app.get('/:phone', async (c) => {
   try {

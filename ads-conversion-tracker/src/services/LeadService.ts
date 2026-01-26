@@ -75,6 +75,19 @@ export class LeadService {
     return `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
   }
 
+  static async getAllLeads(options: { status?: string; limit?: number; offset?: number }): Promise<Lead[]> {
+    try {
+      return await LeadModel.findByStatus({
+        status: options.status || 'novo',
+        limit: options.limit || 100,
+        offset: options.offset || 0
+      });
+    } catch (error) {
+      console.error('Error getting all leads:', error);
+      return [];
+    }
+  }
+
   static async expireOldLeads(days: number = 90): Promise<number> {
     try {
       return await LeadModel.expireLeads(days);

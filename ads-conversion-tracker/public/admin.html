@@ -407,6 +407,67 @@
             }
         }
 
+        async function loadLeads() {
+            try {
+                const response = await fetch(`${API_BASE}/leads?status=novo&limit=50`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showMessage('Erro ao carregar leads', 'error');
+                    return;
+                }
+
+                const leadsTable = document.getElementById('leadsTable');
+                
+                if (!data.leads || data.leads.length === 0) {
+                    leadsTable.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhum lead pendente encontrado</p>';
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Telefone</th>
+                                <th>Campanha</th>
+                                <th>Origem</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.leads.forEach(lead => {
+                    const date = new Date(lead.created_at).toLocaleDateString('pt-BR');
+                    const campaign = lead.utm_campaign || '-';
+                    const source = lead.utm_source || '-';
+                    const statusBadge = `<span class="badge ${lead.status}">${lead.status}</span>`;
+                    const phone = lead.telefone ? lead.telefone.substring(0, 3) + '****' + lead.telefone.substring(lead.telefone.length - 2) : '***';
+
+                    html += `
+                        <tr>
+                            <td><strong>${phone}</strong></td>
+                            <td>${campaign}</td>
+                            <td>${source}</td>
+                            <td>${statusBadge}</td>
+                            <td>${date}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                leadsTable.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading leads:', error);
+                showMessage('Erro ao carregar leads', 'error');
+            }
+        }
+
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
             messageDiv.className = type;
@@ -421,6 +482,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadConversions();
+            loadLeads();
 
             // Refresh stats when filter changes
             document.getElementById('daysFilter').addEventListener('change', loadStats);
@@ -429,6 +491,7 @@
             setInterval(() => {
                 loadStats();
                 loadConversions();
+                loadLeads();
             }, 30000);
         });
     </script>
