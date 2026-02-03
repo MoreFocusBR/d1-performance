@@ -25,7 +25,13 @@ app.use('*', authMiddleware);
  *   "utm_content": "anuncio_1",
  *   "utm_term": "palavra-chave",
  *   "gclid": "google-click-id",
- *   "fbclid": "facebook-click-id"
+ *   "fbclid": "facebook-click-id",
+ *   "shopify_data": {
+ *     "customer_id": "123456",
+ *     "order_id": "order_123",
+ *     "email": "customer@example.com",
+ *     "tags": ["vip", "newsletter"]
+ *   }
  * }
  */
 app.post('/leads', requireAuth, async (c) => {
@@ -49,6 +55,7 @@ app.post('/leads', requireAuth, async (c) => {
       utm_term: body.utm_term,
       gclid: body.gclid,
       fbclid: body.fbclid,
+      shopify_data: body.shopify_data,
       ip_address: c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown',
       user_agent: c.req.header('user-agent') || 'unknown'
     });
@@ -85,11 +92,13 @@ app.post('/leads', requireAuth, async (c) => {
  *   "leads": [
  *     {
  *       "telefone": "(11) 98765-4321",
- *       "utm_campaign": "campanha_1"
+ *       "utm_campaign": "campanha_1",
+ *       "shopify_data": {...}
  *     },
  *     {
  *       "telefone": "(21) 99999-8888",
- *       "utm_campaign": "campanha_2"
+ *       "utm_campaign": "campanha_2",
+ *       "shopify_data": {...}
  *     }
  *   ]
  * }
@@ -137,6 +146,7 @@ app.post('/leads/batch', requireAuth, async (c) => {
           utm_term: leadData.utm_term,
           gclid: leadData.gclid,
           fbclid: leadData.fbclid,
+          shopify_data: leadData.shopify_data,
           ip_address: c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown',
           user_agent: c.req.header('user-agent') || 'unknown'
         });

@@ -42,11 +42,13 @@ API_KEYS=key1,key2,key3
   "utm_medium": "cpc",
   "utm_campaign": "campanha_teste",
   "utm_content": "anuncio_1",
-  "utm_term": "palavra-chave",
-  "gclid": "google-click-id",
-  "fbclid": "facebook-click-id"
-}
-```
+  "utm_term": "palavra-cha *   "gclid": "google-click-id",
+ *   "fbclid": "facebook-click-id",
+ *   "shopify_data": {
+ *     "customer_id": "...",
+ *     "order_id": "..."
+ *   }
+ * }
 
 #### Resposta de Sucesso (201)
 
@@ -72,11 +74,11 @@ API_KEYS=key1,key2,key3
 
 ```json
 {
-  "leads": [
-    {
-      "telefone": "(11) 98765-4321",
-      "utm_campaign": "campanha_1"
-    },
+  *     {
+ *       "telefone": "(11) 98765-4321",
+ *       "utm_campaign": "campanha_1",
+ *       "shopify_data": {...}
+ *     },
     {
       "telefone": "(21) 99999-8888",
       "utm_campaign": "campanha_2"

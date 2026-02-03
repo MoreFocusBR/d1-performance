@@ -63,6 +63,19 @@ export function validateLeadData(data: any): LeadValidationResult {
     }
   }
 
+  // Validar shopify_data (opcional, deve ser um objeto)
+  if (data.shopify_data !== undefined && data.shopify_data !== null) {
+    if (typeof data.shopify_data !== 'object' || Array.isArray(data.shopify_data)) {
+      errors.push('Campo "shopify_data" deve ser um objeto JSON');
+    } else {
+      // Validar tamanho do objeto JSON
+      const jsonString = JSON.stringify(data.shopify_data);
+      if (jsonString.length > 10000) {
+        errors.push('Campo "shopify_data" não pode ter mais de 10KB');
+      }
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors
