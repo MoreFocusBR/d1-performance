@@ -13,31 +13,6 @@ export interface LeadValidationResult {
 export function validateLeadData(data: any): LeadValidationResult {
   const errors: string[] = [];
 
-  // Validar telefone
-  if (!data.telefone) {
-    errors.push('Campo "telefone" é obrigatório');
-  } else if (typeof data.telefone !== 'string') {
-    errors.push('Campo "telefone" deve ser uma string');
-  } else if (data.telefone.trim().length === 0) {
-    errors.push('Campo "telefone" não pode estar vazio');
-  } else {
-    // Validar formato do telefone (apenas números e caracteres especiais)
-    const phoneRegex = /^[\d\s\-\(\)\+]+$/;
-    if (!phoneRegex.test(data.telefone)) {
-      errors.push('Campo "telefone" contém caracteres inválidos');
-    }
-
-    // Validar se tem pelo menos 10 dígitos
-    const digits = data.telefone.replace(/\D/g, '');
-    if (digits.length < 10) {
-      errors.push('Campo "telefone" deve ter pelo menos 10 dígitos');
-    }
-
-    // Validar se tem no máximo 15 dígitos
-    if (digits.length > 15) {
-      errors.push('Campo "telefone" deve ter no máximo 15 dígitos');
-    }
-  }
 
   // Validar UTM parameters (opcional, mas se fornecido, deve ser string)
   const utmFields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
