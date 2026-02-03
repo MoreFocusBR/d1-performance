@@ -38,14 +38,6 @@ app.post('/leads', requireAuth, async (c) => {
   try {
     const body = await c.req.json();
 
-    // Validate required fields
-    if (!body.telefone) {
-      return c.json(
-        { success: false, error: 'Campo "telefone" é obrigatório' },
-        400
-      );
-    }
-
     const result = await LeadService.captureLead({
       telefone: body.telefone,
       utm_source: body.utm_source,
