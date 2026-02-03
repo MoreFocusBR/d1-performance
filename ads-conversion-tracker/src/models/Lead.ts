@@ -14,6 +14,7 @@ export interface Lead {
   fbclid?: string;
   ip_address?: string;
   user_agent?: string;
+  shopify_data?: any; // JSONB field for Shopify data
   created_at: string;
   status: string;
 }
@@ -43,6 +44,7 @@ export class LeadModel {
     fbclid?: string;
     ip_address?: string;
     user_agent?: string;
+    shopify_data?: any;
   }): Promise<Lead> {
     const normalizedPhone = normalizePhone(data.telefone);
     const phoneHash = hashPhone(normalizedPhone);
@@ -51,8 +53,8 @@ export class LeadModel {
     const result = await query<Lead>(
       `INSERT INTO leads (
         telefone, telefone_hash, utm_source, utm_medium, utm_campaign, 
-        utm_content, utm_term, gclid, fbclid, ip_address, user_agent, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        utm_content, utm_term, gclid, fbclid, ip_address, user_agent, shopify_data, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *`,
       [
         encryptedPhone,
@@ -66,6 +68,7 @@ export class LeadModel {
         data.fbclid || null,
         data.ip_address || null,
         data.user_agent || null,
+        data.shopify_data ? JSON.stringify(data.shopify_data) : null,
         'novo'
       ]
     );

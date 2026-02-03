@@ -13,9 +13,8 @@ COPY src ./src
 COPY public ./public
 COPY tsconfig.json .
 
-# Create non-root user with different UID (avoiding conflict with base image)
-# If UID 1000 already exists, use UID 1001
-RUN useradd -m -u 1001 appuser 2>/dev/null || useradd -m appuser && chown -R appuser:appuser /app
+# Create non-root user
+RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port

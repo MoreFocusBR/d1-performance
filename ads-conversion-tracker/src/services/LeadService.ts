@@ -11,6 +11,7 @@ export interface CaptureLeadRequest {
   utm_term?: string;
   gclid?: string;
   fbclid?: string;
+  shopify_data?: any;
   ip_address?: string;
   user_agent?: string;
 }
@@ -41,6 +42,7 @@ export class LeadService {
         utm_term: data.utm_term,
         gclid: data.gclid,
         fbclid: data.fbclid,
+        shopify_data: data.shopify_data,
         ip_address: data.ip_address,
         user_agent: data.user_agent
       });
