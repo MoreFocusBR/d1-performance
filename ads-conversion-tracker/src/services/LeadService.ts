@@ -3,7 +3,7 @@ import { isValidPhone, isValidUTM, extractPhoneFromText } from '../utils/validat
 import { normalizePhone, hashPhone } from '../utils/crypto';
 
 export interface CaptureLeadRequest {
-  telefone: string;
+  telefone?: string | null;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;

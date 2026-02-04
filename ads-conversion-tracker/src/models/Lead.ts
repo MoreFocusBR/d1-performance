@@ -3,8 +3,8 @@ import { hashPhone, encryptPhone, normalizePhone, decryptPhone } from '../utils/
 
 export interface Lead {
   id: string;
-  telefone: string;
-  telefone_hash: string;
+  telefone: string | null;
+  telefone_hash: string | null;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -34,7 +34,7 @@ function decryptLeadData(lead: any): Lead {
 
 export class LeadModel {
   static async create(data: {
-    telefone: string;
+    telefone?: string | null;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
@@ -46,9 +46,9 @@ export class LeadModel {
     user_agent?: string;
     shopify_data?: any;
   }): Promise<Lead> {
-    const normalizedPhone = normalizePhone(data.telefone);
-    const phoneHash = hashPhone(normalizedPhone);
-    const encryptedPhone = encryptPhone(normalizedPhone);
+    const normalizedPhone = data.telefone ? normalizePhone(data.telefone) : null;
+    const phoneHash = normalizedPhone ? hashPhone(normalizedPhone) : null;
+    const encryptedPhone = normalizedPhone ? encryptPhone(normalizedPhone) : null;
 
     const result = await query<Lead>(
       `INSERT INTO leads (
