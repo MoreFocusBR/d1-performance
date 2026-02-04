@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -164,7 +165,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .error {
@@ -229,7 +232,8 @@
                 font-size: 12px;
             }
 
-            th, td {
+            th,
+            td {
                 padding: 8px;
             }
 
@@ -245,6 +249,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>📊 Ads Conversion Tracker</h1>
@@ -263,7 +268,7 @@
 
         <div class="section">
             <h2>Conversões Recentes</h2>
-            
+
             <div class="filters">
                 <select id="daysFilter">
                     <option value="7">Últimos 7 dias</option>
@@ -308,7 +313,7 @@
 
                 const stats = data.stats;
                 const statsGrid = document.getElementById('statsGrid');
-                
+
                 statsGrid.innerHTML = `
                     <div class="stat-card">
                         <h3>Total de Conversões</h3>
@@ -353,7 +358,7 @@
                 }
 
                 const conversionsTable = document.getElementById('conversionsTable');
-                
+
                 if (!data.conversions || data.conversions.length === 0) {
                     conversionsTable.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhuma conversão encontrada</p>';
                     return;
@@ -378,11 +383,11 @@
                     const date = new Date(conv.created_at).toLocaleDateString('pt-BR');
                     const valor = parseFloat(conv.valor_venda).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                     const campaign = conv.lead?.utm_campaign || '-';
-                    const googleBadge = conv.google_ads_enviado ? 
-                        '<span class="badge enviado">✓ Enviado</span>' : 
+                    const googleBadge = conv.google_ads_enviado ?
+                        '<span class="badge enviado">✓ Enviado</span>' :
                         '<span class="badge nao-enviado">✗ Pendente</span>';
-                    const metaBadge = conv.meta_ads_enviado ? 
-                        '<span class="badge enviado">✓ Enviado</span>' : 
+                    const metaBadge = conv.meta_ads_enviado ?
+                        '<span class="badge enviado">✓ Enviado</span>' :
                         '<span class="badge nao-enviado">✗ Pendente</span>';
 
                     html += `
@@ -420,7 +425,7 @@
                 }
 
                 const leadsTable = document.getElementById('leadsTable');
-                
+
                 if (!data.leads || data.leads.length === 0) {
                     leadsTable.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhum lead pendente encontrado</p>';
                     return;
@@ -431,6 +436,7 @@
                         <thead>
                             <tr>
                                 <th>Telefone</th>
+                                <th>E-mail</th>
                                 <th>Campanha</th>
                                 <th>Origem</th>
                                 <th>Status</th>
@@ -446,10 +452,12 @@
                     const source = lead.utm_source || '-';
                     const statusBadge = `<span class="badge ${lead.status}">${lead.status}</span>`;
                     const phone = lead.telefone ? lead.telefone.substring(0, 3) + '****' + lead.telefone.substring(lead.telefone.length - 2) : '***';
+                    const email = lead.email || '***';
 
                     html += `
                         <tr>
                             <td><strong>${phone}</strong></td>
+                            <td>${email}</td>
                             <td>${campaign}</td>
                             <td>${source}</td>
                             <td>${statusBadge}</td>
@@ -498,4 +506,5 @@
         });
     </script>
 </body>
+
 </html>
