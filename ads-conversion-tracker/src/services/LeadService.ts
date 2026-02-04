@@ -1,9 +1,9 @@
 import { LeadModel, Lead } from '../models/Lead';
 import { isValidPhone, isValidUTM, extractPhoneFromText } from '../utils/validation';
-import { normalizePhone, hashPhone } from '../utils/crypto';
+import { normalizePhone } from '../utils/crypto';
 
 export interface CaptureLeadRequest {
-  telefone?: string | null;
+  telefone: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -19,6 +19,14 @@ export interface CaptureLeadRequest {
 export class LeadService {
   static async captureLead(data: CaptureLeadRequest): Promise<{ success: boolean; lead?: Lead; error?: string }> {
     try {
+      // Validate phone
+      if (!data.telefone || !isValidPhone(data.telefone)) {
+        return {
+          success: false,
+          error: 'Telefone inválido. Por favor, verifique o formato.'
+        };
+      }
+
       // Validate UTM parameters
       if (!isValidUTM(data)) {
         console.warn('No UTM parameters provided');
@@ -54,9 +62,7 @@ export class LeadService {
 
   static async findLeadByPhone(phone: string): Promise<Lead | null> {
     try {
-      const normalizedPhone = normalizePhone(phone);
-      const phoneHash = hashPhone(normalizedPhone);
-      return await LeadModel.findByPhoneHash(phoneHash);
+      return await LeadModel.findByPhone(phone);
     } catch (error) {
       console.error('Error finding lead:', error);
       return null;

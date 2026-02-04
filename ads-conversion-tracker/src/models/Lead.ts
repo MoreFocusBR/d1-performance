@@ -1,10 +1,9 @@
 import { query } from '../utils/db';
-import { hashPhone, encryptPhone, normalizePhone, decryptPhone } from '../utils/crypto';
+import { encryptPhone, normalizePhone, decryptPhone } from '../utils/crypto';
 
 export interface Lead {
   id: string;
-  telefone: string | null;
-  telefone_hash: string | null;
+  telefone: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -34,8 +33,7 @@ function decryptLeadData(lead: any): Lead {
 
 export class LeadModel {
   static async create(data: {
-    telefone?: string | null;
-    email?: string | null;
+    telefone: string;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
@@ -47,20 +45,17 @@ export class LeadModel {
     user_agent?: string;
     shopify_data?: any;
   }): Promise<Lead> {
-    const normalizedPhone = data.telefone ? normalizePhone(data.telefone) : null;
-    const phoneHash = normalizedPhone ? hashPhone(normalizedPhone) : null;
-    const encryptedPhone = normalizedPhone ? encryptPhone(normalizedPhone) : null;
+    const normalizedPhone = normalizePhone(data.telefone);
+    const encryptedPhone = encryptPhone(normalizedPhone);
 
     const result = await query<Lead>(
       `INSERT INTO leads (
-        telefone, telefone_hash, email, utm_source, utm_medium, utm_campaign, 
+        telefone, utm_source, utm_medium, utm_campaign, 
         utm_content, utm_term, gclid, fbclid, ip_address, user_agent, shopify_data, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         encryptedPhone,
-        phoneHash,
-        data.email || null,
         data.utm_source || null,
         data.utm_medium || null,
         data.utm_campaign || null,
@@ -78,10 +73,11 @@ export class LeadModel {
     return decryptLeadData(result.rows[0]);
   }
 
-  static async findByPhoneHash(phoneHash: string): Promise<Lead | null> {
+  static async findByPhone(phone: string): Promise<Lead | null> {
+    const normalizedPhone = normalizePhone(phone);
     const result = await query<Lead>(
-      'SELECT * FROM leads WHERE telefone_hash = $1 ORDER BY created_at DESC LIMIT 1',
-      [phoneHash]
+      'SELECT * FROM leads WHERE telefone LIKE $1 ORDER BY created_at DESC LIMIT 1',
+      [`%${normalizedPhone}%`]
     );
 
     return result.rows[0] ? decryptLeadData(result.rows[0]) : null;
