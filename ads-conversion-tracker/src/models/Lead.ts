@@ -35,6 +35,7 @@ function decryptLeadData(lead: any): Lead {
 export class LeadModel {
   static async create(data: {
     telefone?: string | null;
+    email?: string | null;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
@@ -52,13 +53,14 @@ export class LeadModel {
 
     const result = await query<Lead>(
       `INSERT INTO leads (
-        telefone, telefone_hash, utm_source, utm_medium, utm_campaign, 
+        telefone, telefone_hash, email, utm_source, utm_medium, utm_campaign, 
         utm_content, utm_term, gclid, fbclid, ip_address, user_agent, shopify_data, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *`,
       [
         encryptedPhone,
         phoneHash,
+        data.email || null,
         data.utm_source || null,
         data.utm_medium || null,
         data.utm_campaign || null,
