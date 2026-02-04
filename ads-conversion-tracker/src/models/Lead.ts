@@ -34,6 +34,7 @@ function decryptLeadData(lead: any): Lead {
 export class LeadModel {
   static async create(data: {
     telefone: string;
+    email?: string;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;

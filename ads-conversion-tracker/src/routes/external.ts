@@ -40,6 +40,7 @@ app.post('/leads', requireAuth, async (c) => {
 
     const result = await LeadService.captureLead({
       telefone: body.telefone,
+      email: body.shopify_data?.customerEmail,
       utm_source: body.utm_source,
       utm_medium: body.utm_medium,
       utm_campaign: body.utm_campaign,

@@ -4,6 +4,7 @@ import { normalizePhone } from '../utils/crypto';
 
 export interface CaptureLeadRequest {
   telefone: string;
+  email?: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -27,6 +28,7 @@ export class LeadService {
       // Create lead
       const lead = await LeadModel.create({
         telefone: data.telefone,
+        email: data.email,
         utm_source: data.utm_source,
         utm_medium: data.utm_medium,
         utm_campaign: data.utm_campaign,
