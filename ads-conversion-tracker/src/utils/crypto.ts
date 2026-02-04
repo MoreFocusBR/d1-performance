@@ -1,14 +1,10 @@
-import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-min-32-characters-long-key';
 
 // Ensure key is 32 bytes for AES-256
 const key = Buffer.from(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
-
-export function hashPhone(phone: string): string {
-  return createHash('sha256').update(phone).digest('hex');
-}
 
 export function encryptPhone(phone: string): string {
   try {
