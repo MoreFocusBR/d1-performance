@@ -19,14 +19,6 @@ export interface CaptureLeadRequest {
 export class LeadService {
   static async captureLead(data: CaptureLeadRequest): Promise<{ success: boolean; lead?: Lead; error?: string }> {
     try {
-      // Validate phone
-      if (!data.telefone || !isValidPhone(data.telefone)) {
-        return {
-          success: false,
-          error: 'Telefone inválido. Por favor, verifique o formato.'
-        };
-      }
-
       // Validate UTM parameters
       if (!isValidUTM(data)) {
         console.warn('No UTM parameters provided');
