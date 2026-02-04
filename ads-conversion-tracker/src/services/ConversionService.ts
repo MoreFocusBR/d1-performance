@@ -1,7 +1,7 @@
 import { ConversionModel, Conversion } from '../models/Conversion';
 import { LeadModel } from '../models/Lead';
 import { extractPhoneFromText } from '../utils/validation';
-import { normalizePhone, hashPhone } from '../utils/crypto';
+import { normalizePhone } from '../utils/crypto';
 
 export interface ProcessSaleRequest {
   codigo_venda: string;
@@ -32,8 +32,7 @@ export class ConversionService {
       }
 
       // Find corresponding lead
-      const phoneHash = hashPhone(phone);
-      const lead = await LeadModel.findByPhoneHash(phoneHash);
+      const lead = await LeadModel.findByPhone(phone);
       
       if (!lead) {
         return {
