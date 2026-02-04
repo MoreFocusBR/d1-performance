@@ -1,7 +1,6 @@
 import { ConversionModel, Conversion } from '../models/Conversion';
 import { LeadModel } from '../models/Lead';
 import { extractPhoneFromText } from '../utils/validation';
-import { normalizePhone } from '../utils/crypto';
 
 export interface ProcessSaleRequest {
   codigo_venda: string;
@@ -33,7 +32,7 @@ export class ConversionService {
 
       // Find corresponding lead
       const lead = await LeadModel.findByPhone(phone);
-      
+
       if (!lead) {
         return {
           success: false,
@@ -96,7 +95,7 @@ export class ConversionService {
   static async getPendingConversions(): Promise<any[]> {
     try {
       const conversions = await ConversionModel.findPendingConversions();
-      
+
       const result = [];
       for (const conversion of conversions) {
         const lead = await LeadModel.findById(conversion.lead_id);

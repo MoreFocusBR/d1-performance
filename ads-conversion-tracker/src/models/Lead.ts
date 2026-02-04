@@ -1,5 +1,4 @@
 import { query } from '../utils/db';
-import { encryptPhone, normalizePhone, decryptPhone } from '../utils/crypto';
 
 export interface Lead {
   id: string;
@@ -18,19 +17,6 @@ export interface Lead {
   status: string;
 }
 
-// Helper function to decrypt lead data
-function decryptLeadData(lead: any): Lead {
-  try {
-    return {
-      ...lead,
-      telefone: lead.telefone ? decryptPhone(lead.telefone) : lead.telefone
-    };
-  } catch (error) {
-    console.error('Error decrypting lead data:', error);
-    return lead;
-  }
-}
-
 export class LeadModel {
   static async create(data: {
     telefone: string;
@@ -46,17 +32,16 @@ export class LeadModel {
     user_agent?: string;
     shopify_data?: any;
   }): Promise<Lead> {
-    const normalizedPhone = normalizePhone(data.telefone);
-    const encryptedPhone = encryptPhone(normalizedPhone);
 
     const result = await query<Lead>(
       `INSERT INTO leads (
-        telefone, utm_source, utm_medium, utm_campaign, 
+        telefone, email, utm_source, utm_medium, utm_campaign, 
         utm_content, utm_term, gclid, fbclid, ip_address, user_agent, shopify_data, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *`,
       [
-        encryptedPhone,
+        data.telefone || null,
+        data.email || null,
         data.utm_source || null,
         data.utm_medium || null,
         data.utm_campaign || null,
@@ -71,17 +56,16 @@ export class LeadModel {
       ]
     );
 
-    return decryptLeadData(result.rows[0]);
+    return result.rows[0];
   }
 
   static async findByPhone(phone: string): Promise<Lead | null> {
-    const normalizedPhone = normalizePhone(phone);
     const result = await query<Lead>(
       'SELECT * FROM leads WHERE telefone LIKE $1 ORDER BY created_at DESC LIMIT 1',
-      [`%${normalizedPhone}%`]
+      [`%${phone}%`]
     );
 
-    return result.rows[0] ? decryptLeadData(result.rows[0]) : null;
+    return result.rows[0] ? result.rows[0] : null;
   }
 
   static async findById(id: string): Promise<Lead | null> {
@@ -90,7 +74,7 @@ export class LeadModel {
       [id]
     );
 
-    return result.rows[0] ? decryptLeadData(result.rows[0]) : null;
+    return result.rows[0] ? result.rows[0] : null;
   }
 
   static async updateStatus(id: string, status: string): Promise<Lead> {
@@ -99,7 +83,7 @@ export class LeadModel {
       [status, id]
     );
 
-    return decryptLeadData(result.rows[0]);
+    return result.rows[0];
   }
 
   static async findByStatus(options: { status: string; limit: number; offset: number }): Promise<Lead[]> {
@@ -111,7 +95,7 @@ export class LeadModel {
       [options.status, options.limit, options.offset]
     );
 
-    return result.rows.map(decryptLeadData);
+    return result.rows;
   }
 
   static async findExpiredLeads(days: number = 90): Promise<Lead[]> {
@@ -122,7 +106,7 @@ export class LeadModel {
       []
     );
 
-    return result.rows.map(decryptLeadData);
+    return result.rows;
   }
 
   static async expireLeads(days: number = 90): Promise<number> {

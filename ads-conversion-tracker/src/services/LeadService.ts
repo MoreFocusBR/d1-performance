@@ -1,6 +1,5 @@
 import { LeadModel, Lead } from '../models/Lead';
 import { isValidPhone, isValidUTM, extractPhoneFromText } from '../utils/validation';
-import { normalizePhone } from '../utils/crypto';
 
 export interface CaptureLeadRequest {
   telefone: string;
@@ -64,7 +63,7 @@ export class LeadService {
   }
 
   static async generateWhatsAppLink(phone: string, message?: string): Promise<string> {
-    const normalizedPhone = normalizePhone(phone);
+    const normalizedPhone = phone;
     const encodedMessage = encodeURIComponent(message || 'Olá! Gostaria de falar com o time comercial.');
     return `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
   }
