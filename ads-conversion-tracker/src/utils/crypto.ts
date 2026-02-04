@@ -30,11 +30,33 @@ export function encryptPhone(phone: string): string {
 
 export function decryptPhone(encrypted: string): string {
   try {
-    const [ivHex, authTagHex, encryptedData] = encrypted.split(':');
+    // Validate encrypted format
+    if (!encrypted || typeof encrypted !== 'string') {
+      throw new Error('Invalid encrypted data format');
+    }
+
+    const parts = encrypted.split(':');
+    if (parts.length !== 3) {
+      throw new Error('Invalid encrypted data format: expected 3 parts (iv:authTag:data)');
+    }
+
+    const [ivHex, authTagHex, encryptedData] = parts;
     
+    if (!ivHex || !authTagHex || !encryptedData) {
+      throw new Error('Invalid encrypted data: missing parts');
+    }
+
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     
+    if (iv.length !== 16) {
+      throw new Error('Invalid IV length: expected 16 bytes');
+    }
+    
+    if (authTag.length !== 16) {
+      throw new Error('Invalid auth tag length: expected 16 bytes');
+    }
+
     const decipher = createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
     
@@ -44,7 +66,8 @@ export function decryptPhone(encrypted: string): string {
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
-    throw error;
+    // Return a masked version instead of throwing
+    return encrypted.substring(0, 3) + '****' + encrypted.substring(encrypted.length - 3);
   }
 }
 
