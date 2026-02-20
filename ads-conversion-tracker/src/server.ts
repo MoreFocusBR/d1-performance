@@ -4,6 +4,7 @@ import { corsMiddleware } from './middleware/cors';
 import { loggerMiddleware } from './middleware/logger';
 import leadsRouter from './routes/leads';
 import conversionsRouter from './routes/conversions';
+import externalRouter from './routes/external';
 import healthRouter from './routes/health';
 import rdstationRouter from './routes/rdstation';
 
@@ -22,7 +23,7 @@ app.use('/public/*', async (c) => {
   try {
     const file = Bun.file(`./public${filePath}`);
     const buffer = await file.arrayBuffer();
-    
+
     // Determine content type
     let contentType = 'application/octet-stream';
     if (filePath.endsWith('.html')) contentType = 'text/html';
@@ -44,6 +45,7 @@ app.use('/public/*', async (c) => {
 // API Routes
 app.route('/api/leads', leadsRouter);
 app.route('/api/conversions', conversionsRouter);
+app.route('/api/external', externalRouter);
 app.route('/api/sync-rdstation', rdstationRouter);
 app.route('/health', healthRouter);
 
@@ -91,6 +93,7 @@ const port = parseInt(process.env.PORT || '3001');
 console.log(`🚀 Server starting on port ${port}`);
 console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+console.log(`🔐 External API: /api/external (requires API key)`);
 
 serve({
   fetch: app.fetch,

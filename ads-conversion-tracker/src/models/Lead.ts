@@ -3,6 +3,7 @@ import { query } from '../utils/db';
 export interface Lead {
   id: string;
   telefone: string;
+  email?: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -84,6 +85,10 @@ export class LeadModel {
     );
 
     return result.rows[0];
+  }
+
+  static async updateSyncStatus(id: string, status: string): Promise<Lead> {
+    return this.updateStatus(id, status);
   }
 
   static async findByStatus(options: { status: string; limit: number; offset: number }): Promise<Lead[]> {

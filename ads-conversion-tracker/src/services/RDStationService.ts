@@ -31,8 +31,8 @@ export class RDStationService {
       }
 
       // Get all new leads
-      const leads = await LeadModel.findByStatus('novo');
-      
+      const leads = await LeadModel.findByStatus({ status: "novo", limit: 100, offset: 0 });
+
       if (!leads || leads.length === 0) {
         return {
           success: true,
@@ -100,16 +100,16 @@ export class RDStationService {
   private static buildRDStationContact(lead: any): RDStationContact {
     // Extract product and variant information from shopify_data
     let productInfo = '';
-    
+
     if (lead.shopify_data) {
-      const shopifyData = typeof lead.shopify_data === 'string' 
-        ? JSON.parse(lead.shopify_data) 
+      const shopifyData = typeof lead.shopify_data === 'string'
+        ? JSON.parse(lead.shopify_data)
         : lead.shopify_data;
-      
+
       const productName = shopifyData.productName || '';
       const variantName = shopifyData.variantName || '';
-      
-      productInfo = productName || variantName 
+
+      productInfo = productName || variantName
         ? `${productName}${variantName ? ` - ${variantName}` : ''}`
         : '';
     }
@@ -131,7 +131,7 @@ export class RDStationService {
   private static async sendToRDStation(contact: RDStationContact): Promise<boolean> {
     try {
       const url = `${this.rdStationUri}/create-contact-rd`;
-      
+
       console.log(`📨 Enviando contato para RD Station: ${contact.email}`);
 
       const response = await fetch(url, {
@@ -163,7 +163,7 @@ export class RDStationService {
   static async syncLeadById(leadId: string): Promise<boolean> {
     try {
       const lead = await LeadModel.findById(leadId);
-      
+
       if (!lead) {
         console.error(`Lead não encontrado: ${leadId}`);
         return false;
