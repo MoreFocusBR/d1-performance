@@ -6,6 +6,7 @@ import leadsRouter from './routes/leads';
 import conversionsRouter from './routes/conversions';
 import externalRouter from './routes/external';
 import healthRouter from './routes/health';
+import rdstationRouter from './routes/rdstation';
 
 // Load environment variables
 import 'dotenv/config';
@@ -22,7 +23,7 @@ app.use('/public/*', async (c) => {
   try {
     const file = Bun.file(`./public${filePath}`);
     const buffer = await file.arrayBuffer();
-    
+
     // Determine content type
     let contentType = 'application/octet-stream';
     if (filePath.endsWith('.html')) contentType = 'text/html';
@@ -45,6 +46,7 @@ app.use('/public/*', async (c) => {
 app.route('/api/leads', leadsRouter);
 app.route('/api/conversions', conversionsRouter);
 app.route('/api/external', externalRouter);
+app.route('/api/sync-rdstation', rdstationRouter);
 app.route('/health', healthRouter);
 
 // Root route - serve landing page

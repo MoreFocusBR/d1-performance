@@ -17,7 +17,7 @@ export async function query<T = any>(text: string, params?: any[]): Promise<Quer
   try {
     const result = await pool.query<T>(text, params);
     const duration = Date.now() - start;
-    console.log(`[DB] Executed query in ${duration}ms`, { text, params });
+    // console.log(`[DB] Executed query in ${duration}ms`, { text, params });
     return result;
   } catch (error) {
     console.error('[DB] Query error:', error);
