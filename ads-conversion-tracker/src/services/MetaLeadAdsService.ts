@@ -75,7 +75,7 @@ export class MetaLeadAdsService {
 
     try {
       if (payload.object !== 'page') {
-        console.warn('⚠️ [Meta Lead Ads] Payload com object diferente de "page":', payload.object);
+        console.log('⚠️ [Meta Lead Ads] Payload com object diferente de "page":', payload);
         return { success: true, processed: 0, leadgen_ids: [] };
       }
 

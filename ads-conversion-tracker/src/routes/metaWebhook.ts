@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { metaSignatureMiddleware } from '../middleware/metaSignature';
 import { MetaLeadAdsService, MetaWebhookPayload } from '../services/MetaLeadAdsService';
 
+const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || '';
+
 const app = new Hono();
 
 /**
@@ -10,51 +12,30 @@ const app = new Hono();
  * Endpoint de verificação do webhook do Meta.
  * Quando o webhook é configurado no painel de desenvolvedores da Meta,
  * uma requisição GET é enviada para verificar a autenticidade do endpoint.
- * 
- * O Meta envia os seguintes query parameters:
- * - hub.mode: sempre "subscribe"
- * - hub.verify_token: token de verificação configurado no painel
- * - hub.challenge: string que deve ser retornada na resposta
  */
 app.get('/', (c) => {
-  // Leitura dinâmica do token a cada requisição (não em tempo de módulo)
-  const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || '';
+  const mode = c.req.query('hub.mode');
+  const token = c.req.query('hub.verify_token');
+  const challenge = c.req.query('hub.challenge');
 
-  // Tentar obter os parâmetros de múltiplas formas
-  // O Hono pode ter problemas com pontos nos nomes dos query parameters
-  const url = new URL(c.req.url);
-  const mode = url.searchParams.get('hub.mode') || c.req.query('hub.mode') || '';
-  const token = url.searchParams.get('hub.verify_token') || c.req.query('hub.verify_token') || '';
-  const challenge = url.searchParams.get('hub.challenge') || c.req.query('hub.challenge') || '';
+  console.log(`🔐 [Meta Webhook] Verificação recebida - mode: ${mode}`);
 
-  console.log(`🔐 [Meta Webhook] Verificação recebida:`);
-  console.log(`   - mode: "${mode}"`);
-  console.log(`   - token recebido: "${token}"`);
-  console.log(`   - token esperado: "${VERIFY_TOKEN}"`);
-  console.log(`   - challenge: "${challenge}"`);
-  console.log(`   - URL completa: ${c.req.url}`);
-
-  if (!mode || !token) {
-    console.warn('⚠️ [Meta Webhook] Parâmetros de verificação ausentes');
-    return c.json({ error: 'Bad Request', message: 'Parâmetros hub.mode e hub.verify_token são obrigatórios' }, 400);
+  if (mode && token) {
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('✅ [Meta Webhook] Verificação bem-sucedida');
+      // Retornar o challenge como texto plano com status 200
+      return new Response(challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    } else {
+      console.warn('⚠️ [Meta Webhook] Token de verificação inválido');
+      return c.json({ error: 'Forbidden' }, 403);
+    }
   }
 
-  if (!VERIFY_TOKEN) {
-    console.error('❌ [Meta Webhook] META_VERIFY_TOKEN não configurado no ambiente');
-    return c.json({ error: 'Internal Server Error', message: 'Token de verificação não configurado no servidor' }, 500);
-  }
-
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('✅ [Meta Webhook] Verificação bem-sucedida! Retornando challenge.');
-    // Retornar o challenge como texto plano com status 200
-    return new Response(challenge, {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' }
-    });
-  }
-
-  console.warn(`⚠️ [Meta Webhook] Token de verificação inválido. Recebido: "${token}", Esperado: "${VERIFY_TOKEN}"`);
-  return c.json({ error: 'Forbidden', message: 'Token de verificação inválido' }, 403);
+  console.warn('⚠️ [Meta Webhook] Parâmetros de verificação ausentes');
+  return c.json({ error: 'Bad Request' }, 400);
 });
 
 /**
@@ -71,12 +52,12 @@ app.get('/', (c) => {
 app.post('/', metaSignatureMiddleware, async (c) => {
   try {
     // O corpo já foi parseado pelo middleware de assinatura
-    let payload = c.get('parsedBody') as MetaWebhookPayload;
+    const payload = c.get('parsedBody') as MetaWebhookPayload;
 
     if (!payload) {
       // Fallback: tentar parsear o corpo diretamente
-      payload = await c.req.json();
-      if (!payload) {
+      const body = await c.req.json();
+      if (!body) {
         return c.json({ error: 'Payload vazio' }, 400);
       }
     }
