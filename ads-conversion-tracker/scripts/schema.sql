@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS leads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     telefone VARCHAR(255) NOT NULL,
     telefone_hash VARCHAR(64) NOT NULL UNIQUE,
+    email VARCHAR(255) DEFAULT NULL,
     utm_source VARCHAR(100),
     utm_medium VARCHAR(100),
     utm_campaign VARCHAR(255),
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS leads (
     fbclid VARCHAR(255),
     ip_address VARCHAR(45),
     user_agent TEXT,
+    shopify_data JSONB DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50) DEFAULT 'novo'
 );
@@ -40,12 +42,30 @@ CREATE TABLE IF NOT EXISTS conversoes (
 );
 
 -- ============================================
+-- Tabela: meta_webhook_logs
+-- ============================================
+CREATE TABLE IF NOT EXISTS meta_webhook_logs (
+    id              SERIAL PRIMARY KEY,
+    leadgen_id      VARCHAR(100) NOT NULL UNIQUE,
+    ad_id           VARCHAR(100),
+    form_id         VARCHAR(100),
+    page_id         VARCHAR(100),
+    adgroup_id      VARCHAR(100),
+    created_time    BIGINT,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pendente',
+    error_message   TEXT,
+    received_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
 -- Índices: leads
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_leads_telefone_hash ON leads(telefone_hash);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
 CREATE INDEX IF NOT EXISTS idx_leads_status_created ON leads(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_leads_shopify_data ON leads USING GIN (shopify_data);
 
 -- ============================================
 -- Índices: conversoes
@@ -53,6 +73,15 @@ CREATE INDEX IF NOT EXISTS idx_leads_status_created ON leads(status, created_at)
 CREATE INDEX IF NOT EXISTS idx_conversoes_lead_id ON conversoes(lead_id);
 CREATE INDEX IF NOT EXISTS idx_conversoes_codigo_venda ON conversoes(codigo_venda);
 CREATE INDEX IF NOT EXISTS idx_conversoes_created_at ON conversoes(created_at);
+
+-- ============================================
+-- Índices: meta_webhook_logs
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_status ON meta_webhook_logs(status);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_leadgen_id ON meta_webhook_logs(leadgen_id);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_received_at ON meta_webhook_logs(received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_page_id ON meta_webhook_logs(page_id);
+CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_ad_id ON meta_webhook_logs(ad_id);
 
 -- ============================================
 -- Views: Estatísticas
@@ -98,6 +127,22 @@ CREATE TRIGGER trg_update_lead_status
 AFTER INSERT ON conversoes
 FOR EACH ROW
 EXECUTE FUNCTION update_lead_status_on_conversion();
+
+-- ============================================
+-- Comentários
+-- ============================================
+COMMENT ON TABLE meta_webhook_logs IS 'Logs de webhooks recebidos do Meta Lead Ads';
+COMMENT ON COLUMN meta_webhook_logs.leadgen_id IS 'ID único do lead gerado pelo Meta';
+COMMENT ON COLUMN meta_webhook_logs.ad_id IS 'ID do anúncio que gerou o lead';
+COMMENT ON COLUMN meta_webhook_logs.form_id IS 'ID do formulário de lead ads';
+COMMENT ON COLUMN meta_webhook_logs.page_id IS 'ID da página do Facebook';
+COMMENT ON COLUMN meta_webhook_logs.adgroup_id IS 'ID do grupo de anúncios';
+COMMENT ON COLUMN meta_webhook_logs.created_time IS 'Timestamp de criação do lead no Meta (Unix timestamp)';
+COMMENT ON COLUMN meta_webhook_logs.status IS 'Status do processamento: pendente, processado, erro';
+COMMENT ON COLUMN meta_webhook_logs.error_message IS 'Mensagem de erro caso o processamento falhe';
+COMMENT ON COLUMN meta_webhook_logs.received_at IS 'Data/hora de recebimento do webhook';
+COMMENT ON COLUMN meta_webhook_logs.updated_at IS 'Data/hora da última atualização do registro';
+COMMENT ON COLUMN leads.shopify_data IS 'Armazena dados adicionais da Shopify quando o lead vem de uma integração Shopify';
 
 -- ============================================
 -- Verificação: Exibir tabelas criadas
