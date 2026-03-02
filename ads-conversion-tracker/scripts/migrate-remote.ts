@@ -61,43 +61,72 @@ async function runMigrations() {
     `);
     console.log('✅ Tabela conversoes criada');
 
-    // 3. Criar índices
+    // 3. Criar tabela meta_webhook_logs
+    console.log('📝 Criando tabela meta_webhook_logs...');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS meta_webhook_logs (
+        id              SERIAL PRIMARY KEY,
+        leadgen_id      VARCHAR(100) NOT NULL UNIQUE,
+        ad_id           VARCHAR(100),
+        form_id         VARCHAR(100),
+        page_id         VARCHAR(100),
+        adgroup_id      VARCHAR(100),
+        created_time    BIGINT,
+        status          VARCHAR(20) NOT NULL DEFAULT 'pendente',
+        error_message   TEXT,
+        received_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Tabela meta_webhook_logs criada');
+
+    // 4. Adicionar colunas extras na tabela leads (se não existirem)
+    console.log('📝 Verificando colunas extras na tabela leads...');
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'leads' AND column_name = 'email'
+        ) THEN
+          ALTER TABLE leads ADD COLUMN email VARCHAR(255) DEFAULT NULL;
+        END IF;
+      END $$
+    `);
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'leads' AND column_name = 'shopify_data'
+        ) THEN
+          ALTER TABLE leads ADD COLUMN shopify_data JSONB DEFAULT NULL;
+        END IF;
+      END $$
+    `);
+    console.log('✅ Colunas extras verificadas');
+
+    // 5. Criar índices
     console.log('📝 Criando índices...');
     
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_leads_telefone_hash 
-      ON leads(telefone_hash)
-    `);
+    // Índices para leads
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_leads_telefone_hash ON leads(telefone_hash)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_leads_status_created ON leads(status, created_at)`);
     
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_leads_status 
-      ON leads(status)
-    `);
+    // Índices para conversoes
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_conversoes_lead_id ON conversoes(lead_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_conversoes_codigo_venda ON conversoes(codigo_venda)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_conversoes_created_at ON conversoes(created_at)`);
     
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_leads_created_at 
-      ON leads(created_at)
-    `);
-    
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_leads_status_created 
-      ON leads(status, created_at)
-    `);
-    
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_conversoes_lead_id 
-      ON conversoes(lead_id)
-    `);
-    
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_conversoes_codigo_venda 
-      ON conversoes(codigo_venda)
-    `);
-    
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_conversoes_created_at 
-      ON conversoes(created_at)
-    `);
+    // Índices para meta_webhook_logs
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_status ON meta_webhook_logs(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_leadgen_id ON meta_webhook_logs(leadgen_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_received_at ON meta_webhook_logs(received_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_page_id ON meta_webhook_logs(page_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_ad_id ON meta_webhook_logs(ad_id)`);
     
     console.log('✅ Índices criados');
 

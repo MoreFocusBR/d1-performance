@@ -8,6 +8,8 @@ import externalRouter from './routes/external';
 import healthRouter from './routes/health';
 import rdstationRouter from './routes/rdstation';
 import metaWebhookRouter from './routes/metaWebhook';
+import rdstationWebhookRouter from './routes/rdstationWebhook';
+import { runAutoMigrations } from './utils/migrations';
 
 // Load environment variables
 import 'dotenv/config';
@@ -49,6 +51,7 @@ app.route('/api/conversions', conversionsRouter);
 app.route('/api/external', externalRouter);
 app.route('/api/sync-rdstation', rdstationRouter);
 app.route('/webhooks/meta-leads', metaWebhookRouter);
+app.route('/webhooks/rdstation', rdstationWebhookRouter);
 app.route('/health', healthRouter);
 
 // Root route - serve landing page
@@ -89,19 +92,30 @@ app.notFound((c) => {
   return c.json({ error: 'Not found' }, 404);
 });
 
-// Start server
+// Start server with auto-migrations
 const port = parseInt(process.env.PORT || '3001');
 
-console.log(`🚀 Server starting on port ${port}`);
-console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
-console.log(`🔐 External API: /api/external (requires API key)`);
-console.log(`📡 Meta Webhook: /webhooks/meta-leads`);
+async function startServer() {
+  // Executar migrações automáticas antes de iniciar o servidor
+  await runAutoMigrations();
 
-serve({
-  fetch: app.fetch,
-  port: port,
-  hostname: '0.0.0.0'
+  console.log(`🚀 Server starting on port ${port}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+  console.log(`🔐 External API: /api/external (requires API key)`);
+  console.log(`📡 Meta Webhook: /webhooks/meta-leads`);
+  console.log(`📡 RD Station Webhook: /webhooks/rdstation`);
+
+  serve({
+    fetch: app.fetch,
+    port: port,
+    hostname: '0.0.0.0'
+  });
+
+  console.log(`✅ Server running at http://localhost:${port}`);
+}
+
+startServer().catch((error) => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
 });
-
-console.log(`✅ Server running at http://localhost:${port}`);
