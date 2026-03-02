@@ -59,6 +59,48 @@ export async function runAutoMigrations(): Promise<void> {
       END $$
     `);
 
+    // ============================================
+    // Criar tabela rdstation_webhook_logs se não existir
+    // ============================================
+    await query(`
+      CREATE TABLE IF NOT EXISTS rdstation_webhook_logs (
+        id                  SERIAL PRIMARY KEY,
+        rdstation_lead_id   VARCHAR(100) NOT NULL UNIQUE,
+        email               VARCHAR(255),
+        name                VARCHAR(255),
+        company             VARCHAR(255),
+        job_title           VARCHAR(255),
+        bio                 TEXT,
+        public_url          TEXT,
+        opportunity         VARCHAR(10),
+        number_conversions  VARCHAR(20),
+        lead_user           VARCHAR(255),
+        first_conversion    JSONB,
+        last_conversion     JSONB,
+        custom_fields       JSONB,
+        website             VARCHAR(500),
+        personal_phone      VARCHAR(50),
+        mobile_phone        VARCHAR(50),
+        city                VARCHAR(100),
+        estado              VARCHAR(100),
+        lead_stage          VARCHAR(50),
+        tags                JSONB,
+        fit_score           VARCHAR(20),
+        interest            VARCHAR(20),
+        raw_payload         JSONB,
+        status              VARCHAR(20) NOT NULL DEFAULT 'recebido',
+        received_at         TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    // Criar índices para rdstation_webhook_logs
+    await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_status ON rdstation_webhook_logs (status)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_lead_id ON rdstation_webhook_logs (rdstation_lead_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_email ON rdstation_webhook_logs (email)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_received_at ON rdstation_webhook_logs (received_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_opportunity ON rdstation_webhook_logs (opportunity)`);
+
     console.log('✅ [Migrations] Todas as tabelas verificadas/criadas com sucesso');
   } catch (error) {
     console.error('❌ [Migrations] Erro ao executar migrações automáticas:', error);

@@ -8,6 +8,7 @@ import externalRouter from './routes/external';
 import healthRouter from './routes/health';
 import rdstationRouter from './routes/rdstation';
 import metaWebhookRouter from './routes/metaWebhook';
+import rdstationWebhookRouter from './routes/rdstationWebhook';
 import { runAutoMigrations } from './utils/migrations';
 
 // Load environment variables
@@ -50,6 +51,7 @@ app.route('/api/conversions', conversionsRouter);
 app.route('/api/external', externalRouter);
 app.route('/api/sync-rdstation', rdstationRouter);
 app.route('/webhooks/meta-leads', metaWebhookRouter);
+app.route('/webhooks/rdstation', rdstationWebhookRouter);
 app.route('/health', healthRouter);
 
 // Root route - serve landing page
@@ -102,6 +104,7 @@ async function startServer() {
   console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
   console.log(`🔐 External API: /api/external (requires API key)`);
   console.log(`📡 Meta Webhook: /webhooks/meta-leads`);
+  console.log(`📡 RD Station Webhook: /webhooks/rdstation`);
 
   serve({
     fetch: app.fetch,
