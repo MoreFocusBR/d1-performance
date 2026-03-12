@@ -208,22 +208,6 @@
         </div>
     </div>
 
-    <!-- FILTRO DE PERÍODO DOS APORTES -->
-    <div class="card border-green">
-        <div class="card-title">📊 Filtro de Período dos Aportes</div>
-        <div class="date-row">
-            <div style="display:flex;align-items:center;gap:8px">
-                <input type="date" class="date-input" id="aporteStartDate">
-                <span class="date-label">até</span>
-                <input type="date" class="date-input" id="aporteEndDate">
-            </div>
-            <div style="margin-left:auto;display:flex;gap:8px">
-                <button class="quick-btn" onclick="clearAporteFilter()">Limpar Filtro</button>
-                <a href="/aportes" class="quick-btn" style="text-decoration:none;display:inline-flex;align-items:center">⚙️ Gerenciar Aportes</a>
-            </div>
-        </div>
-    </div>
-
     <!-- KPIs -->
     <div class="kpi-grid" id="kpiGrid">
         <div class="kpi orange">
@@ -361,8 +345,6 @@ function initDashboard() {
 
     document.getElementById('startDate').addEventListener('change', loadDashboard);
     document.getElementById('endDate').addEventListener('change', loadDashboard);
-    document.getElementById('aporteStartDate').addEventListener('change', loadDashboard);
-    document.getElementById('aporteEndDate').addEventListener('change', loadDashboard);
 
     setQuickFilter('thisMonth');
 }
@@ -454,15 +436,11 @@ function clearAllChannels() {
 async function loadDashboard() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
-    const aporteStartDate = document.getElementById('aporteStartDate').value;
-    const aporteEndDate = document.getElementById('aporteEndDate').value;
 
     if (!startDate || !endDate) return;
 
     try {
-        let url = `/api/campaigns/performance?start_date=${startDate}&end_date=${endDate}`;
-        if (aporteStartDate) url += `&aporte_start_date=${aporteStartDate}`;
-        if (aporteEndDate) url += `&aporte_end_date=${aporteEndDate}`;
+        const url = `/api/campaigns/performance?start_date=${startDate}&end_date=${endDate}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -686,8 +664,6 @@ function renderCampaignList(campaigns) {
         const color = getChannelColor(c.origem);
         const ticket = c.total_vendas > 0 ? c.valor_total / c.total_vendas : 0;
         const eficiencia = c.total_vendas > 0 ? ((c.valor_total / c.total_vendas) / 1000 * 100).toFixed(1) : '0.0';
-        const roiColor = c.roi >= 0 ? '#44cc88' : '#ff4466';
-        const roiText = c.total_aporte > 0 ? c.roi.toFixed(1) + '%' : 'N/A';
 
         container.innerHTML += `
             <div class="campaign-item" style="border-left-color:${color.border}">
@@ -706,29 +682,23 @@ function renderCampaignList(campaigns) {
                     <div class="ci-value orange">${formatCurrency(c.valor_total)}</div>
                 </div>
                 <div>
-                    <div class="ci-label">Aporte</div>
-                    <div class="ci-value orange">${formatCurrency(c.total_aporte)}</div>
-                    <div class="ci-sub">investido</div>
-                </div>
-                <div>
-                    <div class="ci-label">ROI</div>
-                    <div class="ci-value" style="color:${roiColor}">${roiText}</div>
-                    <div class="ci-sub">retorno</div>
+                    <div class="ci-label">Período Ativo</div>
+                    <div class="ci-value" style="font-size:13px">${formatDate(c.primeira_venda)} a ${formatDate(c.ultima_venda)}</div>
+                    <div class="ci-sub">${c.dias_ativo} dias</div>
                 </div>
                 <div>
                     <div class="ci-label">Ticket Médio</div>
-                    <div class="ci-value green">${formatCurrency(ticket)}</div>
+                    <div class="ci-value orange">${formatCurrency(ticket)}</div>
                     <div class="ci-sub">~ por pedido</div>
+                </div>
+                <div>
+                    <div class="ci-label">Eficiência</div>
+                    <div class="ci-value green">${eficiencia}%</div>
+                    <div class="ci-sub">por campanha</div>
                 </div>
             </div>
         `;
     });
-}
-
-function clearAporteFilter() {
-    document.getElementById('aporteStartDate').value = '';
-    document.getElementById('aporteEndDate').value = '';
-    loadDashboard();
 }
 
 // Auto-refresh every 60 seconds

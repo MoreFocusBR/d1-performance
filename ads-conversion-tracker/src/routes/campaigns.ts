@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { query } from '../utils/db';
+import { AporteService } from '../services/AporteService';
 
 const app = new Hono();
 
@@ -7,18 +8,22 @@ const app = new Hono();
  * GET /api/campaigns/performance
  * 
  * Retorna dados de performance das campanhas cruzando vendas com leads da RD Station.
- * Aceita filtros de data e canal (origem).
+ * Aceita filtros de data de vendas e data de aportes.
  * 
  * Query Parameters:
- *   - start_date: Data início (YYYY-MM-DD)
- *   - end_date: Data fim (YYYY-MM-DD)
+ *   - start_date: Data início vendas (YYYY-MM-DD)
+ *   - end_date: Data fim vendas (YYYY-MM-DD)
  *   - origem: Filtrar por canal/origem específico (pode ser múltiplo, separado por vírgula)
+ *   - aporte_start_date: Data início aportes (YYYY-MM-DD)
+ *   - aporte_end_date: Data fim aportes (YYYY-MM-DD)
  */
 app.get('/performance', async (c) => {
   try {
     const startDate = c.req.query('start_date');
     const endDate = c.req.query('end_date');
     const origemFilter = c.req.query('origem');
+    const aporteStartDate = c.req.query('aporte_start_date');
+    const aporteEndDate = c.req.query('aporte_end_date');
 
     let dateFilter = '';
     const params: any[] = [];
@@ -76,12 +81,12 @@ app.get('/performance', async (c) => {
     let totalsParamIndex = 1;
 
     if (startDate) {
-      totalsDateFilter += ` AND v."DataVenda"::timestamp >= $${totalsParamIndex}::timestamp`;
+      totalsDateFilter += ` AND v."DataVenda" >= $${totalsParamIndex}`;
       totalsParams.push(startDate);
       totalsParamIndex++;
     }
     if (endDate) {
-      totalsDateFilter += ` AND v."DataVenda"::timestamp <= $${totalsParamIndex}::timestamp + interval '1 day'`;
+      totalsDateFilter += ` AND v."DataVenda" <= $${totalsParamIndex}::date + interval '1 day'`;
       totalsParams.push(endDate);
       totalsParamIndex++;
     }
@@ -128,8 +133,8 @@ app.get('/performance', async (c) => {
           v."Cancelada" = false
           AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
           AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
-          AND v."DataVenda"::timestamp >= $1::timestamp
-          AND v."DataVenda"::timestamp <= $2::timestamp + interval '1 day'
+          AND v."DataVenda" >= $1
+          AND v."DataVenda" <= $2::date + interval '1 day'
       `, [prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]]);
 
       if (prevResult.rows[0]) {
@@ -156,27 +161,49 @@ app.get('/performance', async (c) => {
       ORDER BY origem
     `);
 
+    // Obter aportes agregados
+    const aportes = await AporteService.getAggregated({
+      data_inicio: aporteStartDate,
+      data_fim: aporteEndDate
+    });
+
+    // Criar mapa de aportes para lookup rápido
+    const aportesMap: Record<string, Record<string, number>> = {};
+    aportes.forEach(a => {
+      if (!aportesMap[a.utm_campaign]) {
+        aportesMap[a.utm_campaign] = {};
+      }
+      aportesMap[a.utm_campaign][a.origem] = parseFloat(a.total_aporte);
+    });
+
     // Agrupar por canal para os gráficos
-    const channelStats: Record<string, { total_vendas: number; valor_total: number; campanhas: Set<string> }> = {};
+    const channelStats: Record<string, { total_vendas: number; valor_total: number; total_aporte: number; campanhas: Set<string> }> = {};
     for (const row of campaignResult.rows) {
       const channel = row.origem || '(direct)';
       if (!channelStats[channel]) {
-        channelStats[channel] = { total_vendas: 0, valor_total: 0, campanhas: new Set() };
+        channelStats[channel] = { total_vendas: 0, valor_total: 0, total_aporte: 0, campanhas: new Set() };
       }
       channelStats[channel].total_vendas += parseInt(row.total_vendas);
       channelStats[channel].valor_total += parseFloat(row.valor_total_vendas);
       channelStats[channel].campanhas.add(row.utm_campaign);
+
+      // Somar aportes
+      if (aportesMap[row.utm_campaign] && aportesMap[row.utm_campaign][channel]) {
+        channelStats[channel].total_aporte += aportesMap[row.utm_campaign][channel];
+      }
     }
 
     const channelSummary = Object.entries(channelStats).map(([channel, stats]) => ({
       channel,
       total_vendas: stats.total_vendas,
       valor_total: stats.valor_total,
+      total_aporte: stats.total_aporte,
+      roi: stats.total_aporte > 0 ? ((stats.valor_total - stats.total_aporte) / stats.total_aporte * 100) : 0,
       ticket_medio: stats.total_vendas > 0 ? stats.valor_total / stats.total_vendas : 0,
       total_campanhas: stats.campanhas.size
     })).sort((a, b) => b.valor_total - a.valor_total);
 
-    // Formatar campanhas com dados de eficiência
+    // Formatar campanhas com dados de eficiência e ROI
     const campaigns = campaignResult.rows.map(row => {
       const totalVendas = parseInt(row.total_vendas);
       const valorTotal = parseFloat(row.valor_total_vendas);
@@ -190,11 +217,17 @@ app.get('/performance', async (c) => {
         );
       }
 
+      // Obter aporte para esta campanha
+      const aporte = aportesMap[row.utm_campaign]?.[row.origem] || 0;
+      const roi = aporte > 0 ? ((valorTotal - aporte) / aporte * 100) : 0;
+
       return {
         utm_campaign: row.utm_campaign,
         origem: row.origem || '(direct)',
         total_vendas: totalVendas,
         valor_total: valorTotal,
+        total_aporte: aporte,
+        roi: roi,
         ticket_medio: totalVendas > 0 ? valorTotal / totalVendas : 0,
         primeira_venda: primeiraVenda,
         ultima_venda: ultimaVenda,
@@ -204,6 +237,7 @@ app.get('/performance', async (c) => {
     });
 
     const currentTotals = totalsResult.rows[0] || { total_vendas: 0, valor_total: 0, ticket_medio: 0 };
+    const totalAportes = await AporteService.getTotalByPeriod(aporteStartDate, aporteEndDate);
 
     return c.json({
       success: true,
@@ -211,6 +245,8 @@ app.get('/performance', async (c) => {
         total_vendas: parseInt(currentTotals.total_vendas) || 0,
         valor_total: parseFloat(currentTotals.valor_total) || 0,
         ticket_medio: parseFloat(currentTotals.ticket_medio) || 0,
+        total_aportes: totalAportes,
+        roi_geral: totalAportes > 0 ? ((parseFloat(currentTotals.valor_total) - totalAportes) / totalAportes * 100) : 0,
         previous: previousTotals
       },
       channels: channelSummary,
