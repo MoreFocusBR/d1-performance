@@ -133,8 +133,8 @@ app.get('/performance', async (c) => {
           v."Cancelada" = false
           AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
           AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
-          AND v."DataVenda" >= $1
-          AND v."DataVenda" <= $2::date + interval '1 day'
+          AND v."DataVenda"::date >= $1::date
+          AND v."DataVenda"::date <= $2::date
       `, [prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]]);
 
       if (prevResult.rows[0]) {
