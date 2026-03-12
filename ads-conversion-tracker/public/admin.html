@@ -462,7 +462,7 @@
             padding: 18px 20px;
             margin-bottom: 12px;
             display: grid;
-            grid-template-columns: 1.2fr 0.8fr 1fr 1.2fr 1fr 0.8fr;
+            grid-template-columns: 1.2fr 0.8fr 0.8fr 1fr 1.2fr 1fr 0.8fr;
             gap: 16px;
             align-items: center;
             border-left: 3px solid #FF6B35;
@@ -865,11 +865,15 @@
         // ===== STATE =====
         let dashboardData = null;
         let selectedChannels = new Set();
+        let selectedOrigemPedido = new Set();
         let allChannels = [];
+        let allOrigemPedido = [];
         let chartVendasCanal = null;
         let chartValorCanal = null;
         let chartTopCampanhas = null;
         let chartDonut = null;
+        let chartOrigemPedidoVendas = null;
+        let chartOrigemPedidoValor = null;
 
         const CHANNEL_COLORS = {
             'facebook': { bg: '#2266cc55', border: '#2266cc', text: '#6699ff' },
@@ -894,6 +898,21 @@
 
         function getChannelColor(channel) {
             return CHANNEL_COLORS[channel?.toLowerCase()] || DEFAULT_COLOR;
+        }
+
+        const ORIGEM_PEDIDO_COLORS = {
+            'loja fisica': { bg: '#FF6B3555', border: '#FF6B35', text: '#FF6B35' },
+            'loja física': { bg: '#FF6B3555', border: '#FF6B35', text: '#FF6B35' },
+            'e-commerce': { bg: '#4488ff55', border: '#4488ff', text: '#4488ff' },
+            'ecommerce': { bg: '#4488ff55', border: '#4488ff', text: '#4488ff' },
+            'telefone': { bg: '#44cc8855', border: '#44cc88', text: '#44cc88' },
+            'whatsapp': { bg: '#22aa4455', border: '#22aa44', text: '#44dd66' },
+            'presencial': { bg: '#aa662255', border: '#aa6622', text: '#dd8844' },
+            'online': { bg: '#8844cc55', border: '#8844cc', text: '#aa66ff' },
+        };
+
+        function getOrigemPedidoColor(origemPedido) {
+            return ORIGEM_PEDIDO_COLORS[origemPedido?.toLowerCase()] || DEFAULT_COLOR;
         }
 
         // ===== INIT =====
@@ -993,6 +1012,44 @@
             renderFilteredData();
         }
 
+        // ===== ORIGEM PEDIDO FILTERS =====
+        function renderOrigemPedidoTags() {
+            const container = document.getElementById('origemPedidoTags');
+            container.innerHTML = '';
+
+            allOrigemPedido.forEach(op => {
+                const color = getOrigemPedidoColor(op);
+                const isActive = selectedOrigemPedido.has(op);
+                const tag = document.createElement('span');
+                tag.className = 'ch-tag' + (isActive ? ' on' : '');
+                tag.style.background = isActive ? color.bg : '#1e1e35';
+                tag.style.borderColor = isActive ? color.border : '#2a2a45';
+                tag.style.color = isActive ? '#fff' : '#8888aa';
+                tag.innerHTML = op + (isActive ? ' <span class="x">&times;</span>' : '');
+                tag.onclick = () => toggleOrigemPedido(op);
+                container.appendChild(tag);
+            });
+        }
+
+        function toggleOrigemPedido(op) {
+            if (selectedOrigemPedido.has(op)) selectedOrigemPedido.delete(op);
+            else selectedOrigemPedido.add(op);
+            renderOrigemPedidoTags();
+            renderFilteredData();
+        }
+
+        function selectAllOrigemPedido() {
+            allOrigemPedido.forEach(op => selectedOrigemPedido.add(op));
+            renderOrigemPedidoTags();
+            renderFilteredData();
+        }
+
+        function clearAllOrigemPedido() {
+            selectedOrigemPedido.clear();
+            renderOrigemPedidoTags();
+            renderFilteredData();
+        }
+
         // ===== LOAD DATA =====
         async function loadDashboard() {
             const startDate = document.getElementById('startDate').value;
@@ -1006,6 +1063,8 @@
                 let url = `/api/campaigns/performance?start_date=${startDate}&end_date=${endDate}`;
                 if (aporteStartDate) url += `&aporte_start_date=${aporteStartDate}`;
                 if (aporteEndDate) url += `&aporte_end_date=${aporteEndDate}`;
+                if (selectedChannels.size > 0) url += `&origem=${Array.from(selectedChannels).join(',')}`;
+                if (selectedOrigemPedido.size > 0) url += `&origem_pedido=${Array.from(selectedOrigemPedido).join(',')}`;
                 const res = await fetch(url);
                 const data = await res.json();
 
@@ -1022,6 +1081,14 @@
                     allChannels.forEach(ch => selectedChannels.add(ch));
                 }
                 renderChannelTags();
+
+                // Set origem pedido
+                allOrigemPedido = data.available_origem_pedido || [];
+                if (selectedOrigemPedido.size === 0) {
+                    allOrigemPedido.forEach(op => selectedOrigemPedido.add(op));
+                }
+                renderOrigemPedidoTags();
+
                 renderFilteredData();
 
                 // Update timestamp
@@ -1035,10 +1102,11 @@
         function renderFilteredData() {
             if (!dashboardData) return;
 
-            const filtered = dashboardData.campaigns.filter(c => selectedChannels.has(c.origem));
+            const filtered = dashboardData.campaigns.filter(c => selectedChannels.has(c.origem) && selectedOrigemPedido.has(c.origem_pedido));
 
             renderKPIs(filtered);
             renderChannelCharts(filtered);
+            renderOrigemPedidoCharts(filtered);
             renderChannelCards(filtered);
             renderTopCampaigns(filtered);
             renderDonut(filtered);
@@ -1115,6 +1183,62 @@
                 type: 'bar',
                 data: { labels, datasets: [{ data: valorData, backgroundColor: '#4488ff', borderRadius: 4, maxBarThickness: 40 }] },
                 options: chartOpts
+            });
+        }
+
+        function renderOrigemPedidoCharts(campaigns) {
+            // Aggregate by origem_pedido
+            const origemPedidos = {};
+            campaigns.forEach(c => {
+                const op = c.origem_pedido || 'Não informado';
+                if (!origemPedidos[op]) origemPedidos[op] = { vendas: 0, valor: 0 };
+                origemPedidos[op].vendas += c.total_vendas;
+                origemPedidos[op].valor += c.valor_total;
+            });
+
+            const labels = Object.keys(origemPedidos).sort((a, b) => origemPedidos[b].valor - origemPedidos[a].valor);
+            const vendasData = labels.map(l => origemPedidos[l].vendas);
+            const valorData = labels.map(l => origemPedidos[l].valor);
+            const donutColors = labels.map(l => getOrigemPedidoColor(l).border);
+
+            // Destroy old charts
+            if (chartOrigemPedidoVendas) chartOrigemPedidoVendas.destroy();
+            if (chartOrigemPedidoValor) chartOrigemPedidoValor.destroy();
+
+            chartOrigemPedidoVendas = new Chart(document.getElementById('chartOrigemPedidoVendas'), {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: vendasData,
+                        backgroundColor: donutColors,
+                        borderWidth: 0,
+                        cutout: '55%'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#ccc', font: { size: 11 } } } }
+                }
+            });
+
+            chartOrigemPedidoValor = new Chart(document.getElementById('chartOrigemPedidoValor'), {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: valorData,
+                        backgroundColor: donutColors,
+                        borderWidth: 0,
+                        cutout: '55%'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#ccc', font: { size: 11 } } } }
+                }
             });
         }
 
@@ -1233,12 +1357,17 @@
                 const roasPercent = c.total_aporte > 0 ? ((c.roas - 1) * 100).toFixed(1) + '%' : 'N/A';
                 const roiColor = c.roas >= 1 ? '#44cc88' : '#ff4466';
 
-                container.innerHTML += `
+                const origemPedidoColor = getOrigemPedidoColor(c.origem_pedido);
+            container.innerHTML += `
             <div class="campaign-item" style="border-left-color:${color.border}">
                 <div>
                     <div class="ci-label">Campanha</div>
                     <div class="campaign-name">${c.utm_campaign}</div>
                     <span class="source-badge" style="background:${color.bg};color:${color.text}">${c.origem}</span>
+                </div>
+                <div>
+                    <div class="ci-label">Canal da Venda</div>
+                    <span class="source-badge" style="background:${origemPedidoColor.bg};color:${origemPedidoColor.text}">${c.origem_pedido}</span>
                 </div>
                 <div>
                     <div class="ci-label">Total de Vendas</div>
