@@ -1,0 +1,15 @@
+﻿
+
+--- CHECKING DB: d1_orquestrador_db ---
+Tables found:
+[MATCH] public.ItensVenda
+[MATCH] public.RecebiveisVendas
+[MATCH] public.StatusVenda
+[MATCH] public.Venda
+[MATCH] public.VendaAnymarket
+[MATCH] public.vendas_mercos
+
+
+--- CHECKING DB: d1_performance ---
+Tables found:
+[MATCH] public.rdstation_webhook_logs

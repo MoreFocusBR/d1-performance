@@ -25,12 +25,12 @@ app.get('/performance', async (c) => {
     let paramIndex = 1;
 
     if (startDate) {
-      dateFilter += ` AND v."DataVenda" >= $${paramIndex}`;
+      dateFilter += ` AND v."DataVenda"::timestamp >= $${paramIndex}::timestamp`;
       params.push(startDate);
       paramIndex++;
     }
     if (endDate) {
-      dateFilter += ` AND v."DataVenda" <= $${paramIndex}::date + interval '1 day'`;
+      dateFilter += ` AND v."DataVenda"::timestamp <= $${paramIndex}::timestamp + interval '1 day'`;
       params.push(endDate);
       paramIndex++;
     }
@@ -76,12 +76,12 @@ app.get('/performance', async (c) => {
     let totalsParamIndex = 1;
 
     if (startDate) {
-      totalsDateFilter += ` AND v."DataVenda" >= $${totalsParamIndex}`;
+      totalsDateFilter += ` AND v."DataVenda"::timestamp >= $${totalsParamIndex}::timestamp`;
       totalsParams.push(startDate);
       totalsParamIndex++;
     }
     if (endDate) {
-      totalsDateFilter += ` AND v."DataVenda" <= $${totalsParamIndex}::date + interval '1 day'`;
+      totalsDateFilter += ` AND v."DataVenda"::timestamp <= $${totalsParamIndex}::timestamp + interval '1 day'`;
       totalsParams.push(endDate);
       totalsParamIndex++;
     }
@@ -128,8 +128,8 @@ app.get('/performance', async (c) => {
           v."Cancelada" = false
           AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
           AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
-          AND v."DataVenda" >= $1
-          AND v."DataVenda" <= $2::date + interval '1 day'
+          AND v."DataVenda"::timestamp >= $1::timestamp
+          AND v."DataVenda"::timestamp <= $2::timestamp + interval '1 day'
       `, [prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]]);
 
       if (prevResult.rows[0]) {
