@@ -686,8 +686,9 @@ function renderCampaignList(campaigns) {
         const color = getChannelColor(c.origem);
         const ticket = c.total_vendas > 0 ? c.valor_total / c.total_vendas : 0;
         const eficiencia = c.total_vendas > 0 ? ((c.valor_total / c.total_vendas) / 1000 * 100).toFixed(1) : '0.0';
-        const roiColor = c.roi >= 0 ? '#44cc88' : '#ff4466';
-        const roiText = c.total_aporte > 0 ? c.roi.toFixed(1) + '%' : 'N/A';
+        const roasDecimal = c.total_aporte > 0 ? c.roas.toFixed(2) : 'N/A';
+        const roasPercent = c.total_aporte > 0 ? ((c.roas - 1) * 100).toFixed(1) + '%' : 'N/A';
+        const roiColor = c.roas >= 1 ? '#44cc88' : '#ff4466';
 
         container.innerHTML += `
             <div class="campaign-item" style="border-left-color:${color.border}">
@@ -711,9 +712,9 @@ function renderCampaignList(campaigns) {
                     <div class="ci-sub">investido</div>
                 </div>
                 <div>
-                    <div class="ci-label">ROI</div>
-                    <div class="ci-value" style="color:${roiColor}">${roiText}</div>
-                    <div class="ci-sub">retorno</div>
+                    <div class="ci-label">ROAS</div>
+                    <div class="ci-value" style="color:${roiColor}">${roasDecimal}</div>
+                    <div class="ci-sub">${roasPercent}</div>
                 </div>
                 <div>
                     <div class="ci-label">Ticket Médio</div>

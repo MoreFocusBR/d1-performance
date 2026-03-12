@@ -198,7 +198,7 @@ app.get('/performance', async (c) => {
       total_vendas: stats.total_vendas,
       valor_total: stats.valor_total,
       total_aporte: stats.total_aporte,
-      roi: stats.total_aporte > 0 ? ((stats.valor_total - stats.total_aporte) / stats.total_aporte * 100) : 0,
+      roas: stats.total_aporte > 0 ? stats.valor_total / stats.total_aporte : 0,
       ticket_medio: stats.total_vendas > 0 ? stats.valor_total / stats.total_vendas : 0,
       total_campanhas: stats.campanhas.size
     })).sort((a, b) => b.valor_total - a.valor_total);
@@ -219,7 +219,7 @@ app.get('/performance', async (c) => {
 
       // Obter aporte para esta campanha
       const aporte = aportesMap[row.utm_campaign]?.[row.origem] || 0;
-      const roi = aporte > 0 ? ((valorTotal - aporte) / aporte * 100) : 0;
+      const roas = aporte > 0 ? valorTotal / aporte : 0;
 
       return {
         utm_campaign: row.utm_campaign,
@@ -227,7 +227,7 @@ app.get('/performance', async (c) => {
         total_vendas: totalVendas,
         valor_total: valorTotal,
         total_aporte: aporte,
-        roi: roi,
+        roas: roas,
         ticket_medio: totalVendas > 0 ? valorTotal / totalVendas : 0,
         primeira_venda: primeiraVenda,
         ultima_venda: ultimaVenda,
@@ -246,7 +246,7 @@ app.get('/performance', async (c) => {
         valor_total: parseFloat(currentTotals.valor_total) || 0,
         ticket_medio: parseFloat(currentTotals.ticket_medio) || 0,
         total_aportes: totalAportes,
-        roi_geral: totalAportes > 0 ? ((parseFloat(currentTotals.valor_total) - totalAportes) / totalAportes * 100) : 0,
+        roas_geral: totalAportes > 0 ? parseFloat(currentTotals.valor_total) / totalAportes : 0,
         previous: previousTotals
       },
       channels: channelSummary,
