@@ -9,6 +9,7 @@ import healthRouter from './routes/health';
 import rdstationRouter from './routes/rdstation';
 import metaWebhookRouter from './routes/metaWebhook';
 import rdstationWebhookRouter from './routes/rdstationWebhook';
+import campaignsRouter from './routes/campaigns';
 import { runAutoMigrations } from './utils/migrations';
 
 // Load environment variables
@@ -52,6 +53,7 @@ app.route('/api/external', externalRouter);
 app.route('/api/sync-rdstation', rdstationRouter);
 app.route('/webhooks/meta-leads', metaWebhookRouter);
 app.route('/webhooks/rdstation', rdstationWebhookRouter);
+app.route('/api/campaigns', campaignsRouter);
 app.route('/health', healthRouter);
 
 // Root route - serve landing page
