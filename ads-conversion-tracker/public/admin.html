@@ -1230,7 +1230,21 @@
             const labels = Object.keys(origemPedidos).sort((a, b) => origemPedidos[b].valor - origemPedidos[a].valor);
             const vendasData = labels.map(l => origemPedidos[l].vendas);
             const valorData = labels.map(l => origemPedidos[l].valor);
-            const donutColors = labels.map(l => getOrigemPedidoColor(l).border);
+            
+            // Paleta de cores vibrante para os gráficos
+            const vibrantColors = [
+                '#FF6B35', // Laranja vibrante
+                '#4488FF', // Azul vibrante
+                '#44CC88', // Verde vibrante
+                '#FFD700', // Ouro
+                '#FF4466', // Rosa/Vermelho
+                '#AA66FF', // Roxo
+                '#FF8844', // Laranja escuro
+                '#44CCFF', // Ciano
+                '#FF6699', // Magenta
+                '#88FF44'  // Verde claro
+            ];
+            const donutColors = labels.map((_, i) => vibrantColors[i % vibrantColors.length]);
 
             // Destroy old charts
             if (chartOrigemPedidoVendas) chartOrigemPedidoVendas.destroy();
@@ -1243,14 +1257,27 @@
                     datasets: [{
                         data: vendasData,
                         backgroundColor: donutColors,
-                        borderWidth: 0,
+                        borderColor: '#0a0a15',
+                        borderWidth: 2,
                         cutout: '55%'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#ccc', font: { size: 11 } } } }
+                    plugins: { 
+                        legend: { 
+                            display: true, 
+                            position: 'bottom', 
+                            labels: { 
+                                color: '#ccc', 
+                                font: { size: 11, weight: '600' },
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            } 
+                        } 
+                    }
                 }
             });
 
@@ -1261,14 +1288,27 @@
                     datasets: [{
                         data: valorData,
                         backgroundColor: donutColors,
-                        borderWidth: 0,
+                        borderColor: '#0a0a15',
+                        borderWidth: 2,
                         cutout: '55%'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#ccc', font: { size: 11 } } } }
+                    plugins: { 
+                        legend: { 
+                            display: true, 
+                            position: 'bottom', 
+                            labels: { 
+                                color: '#ccc', 
+                                font: { size: 11, weight: '600' },
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            } 
+                        } 
+                    }
                 }
             });
         }
