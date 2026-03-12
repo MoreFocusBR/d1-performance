@@ -101,6 +101,30 @@ export async function runAutoMigrations(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_received_at ON rdstation_webhook_logs (received_at DESC)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_opportunity ON rdstation_webhook_logs (opportunity)`);
 
+    // ============================================
+    // Criar tabela performance_aporte_campanha
+    // ============================================
+    await query(`
+      CREATE TABLE IF NOT EXISTS performance_aporte_campanha (
+        id                  SERIAL PRIMARY KEY,
+        utm_campaign        VARCHAR(255) NOT NULL,
+        origem              VARCHAR(100) NOT NULL,
+        valor_aporte        NUMERIC(15, 2) NOT NULL,
+        data_aporte         DATE NOT NULL,
+        descricao           TEXT,
+        created_by          VARCHAR(255),
+        created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(utm_campaign, origem, data_aporte)
+      )
+    `);
+
+    // Criar índices para performance_aporte_campanha
+    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_utm ON performance_aporte_campanha (utm_campaign)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_origem ON performance_aporte_campanha (origem)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_data ON performance_aporte_campanha (data_aporte DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_combo ON performance_aporte_campanha (utm_campaign, origem, data_aporte)`);
+
     console.log('✅ [Migrations] Todas as tabelas verificadas/criadas com sucesso');
   } catch (error) {
     console.error('❌ [Migrations] Erro ao executar migrações automáticas:', error);

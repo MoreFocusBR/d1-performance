@@ -10,6 +10,7 @@ import rdstationRouter from './routes/rdstation';
 import metaWebhookRouter from './routes/metaWebhook';
 import rdstationWebhookRouter from './routes/rdstationWebhook';
 import campaignsRouter from './routes/campaigns';
+import aportesRouter from './routes/aportes';
 import { runAutoMigrations } from './utils/migrations';
 
 // Load environment variables
@@ -54,6 +55,7 @@ app.route('/api/sync-rdstation', rdstationRouter);
 app.route('/webhooks/meta-leads', metaWebhookRouter);
 app.route('/webhooks/rdstation', rdstationWebhookRouter);
 app.route('/api/campaigns', campaignsRouter);
+app.route('/api/aportes', aportesRouter);
 app.route('/health', healthRouter);
 
 // Root route - serve landing page
@@ -86,6 +88,27 @@ app.get('/admin.html', async (c) => {
     return c.html(html);
   } catch (error) {
     return c.html('<h1>Admin Panel - Coming Soon</h1>');
+  }
+});
+
+// Aportes management route
+app.get('/aportes', async (c) => {
+  try {
+    const file = Bun.file('./public/aportes.html');
+    const html = await file.text();
+    return c.html(html);
+  } catch (error) {
+    return c.html('<h1>Aportes Management - Coming Soon</h1>');
+  }
+});
+
+app.get('/aportes.html', async (c) => {
+  try {
+    const file = Bun.file('./public/aportes.html');
+    const html = await file.text();
+    return c.html(html);
+  } catch (error) {
+    return c.html('<h1>Aportes Management - Coming Soon</h1>');
   }
 });
 
