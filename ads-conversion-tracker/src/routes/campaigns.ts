@@ -30,12 +30,12 @@ app.get('/performance', async (c) => {
     let paramIndex = 1;
 
     if (startDate) {
-      dateFilter += ` AND v."DataVenda"::timestamp >= $${paramIndex}::timestamp`;
+      dateFilter += ` AND v."DataVenda"::date >= $${paramIndex}::date`;
       params.push(startDate);
       paramIndex++;
     }
     if (endDate) {
-      dateFilter += ` AND v."DataVenda"::timestamp <= $${paramIndex}::timestamp + interval '1 day'`;
+      dateFilter += ` AND v."DataVenda"::date <= $${paramIndex}::date`;
       params.push(endDate);
       paramIndex++;
     }
@@ -81,12 +81,12 @@ app.get('/performance', async (c) => {
     let totalsParamIndex = 1;
 
     if (startDate) {
-      totalsDateFilter += ` AND v."DataVenda" >= $${totalsParamIndex}`;
+      totalsDateFilter += ` AND v."DataVenda"::date >= $${totalsParamIndex}::date`;
       totalsParams.push(startDate);
       totalsParamIndex++;
     }
     if (endDate) {
-      totalsDateFilter += ` AND v."DataVenda" <= $${totalsParamIndex}::date + interval '1 day'`;
+      totalsDateFilter += ` AND v."DataVenda"::date <= $${totalsParamIndex}::date`;
       totalsParams.push(endDate);
       totalsParamIndex++;
     }
