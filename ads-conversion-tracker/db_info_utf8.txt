@@ -1,0 +1,203 @@
+﻿--- TABLES (One per line) ---
+AdminUsers
+Atendimento
+AtendimentoExport
+Categoria
+ConversationContext
+EtapasPedidos
+Extrato
+Integracao4Shark
+ItensVenda
+Mensagem
+Nfe
+NotaItens
+Produto
+ProdutoCategoria
+RastreioCampanhas
+RastreioChat
+RastreioChatMetricas
+RastreioStatusEmail
+RastreioStatusWhats
+RastreioUpdateStatus
+RawAnswer
+Recebiveis
+RecebiveisVendas
+RelAgenteLogin
+RelProdutividadePorData
+Respondi
+StatusAtendimento
+StatusVenda
+UltimaAtualizacaoDash
+UltimoAtendimento
+Venda
+VendaAnymarket
+_prisma_migrations
+alertas_disparados
+colaboradores
+colaboradores_beneficios
+colaboradores_contatos_emergencia
+colaboradores_dados_salariais
+colaboradores_descontos
+colaboradores_documentos
+colaboradores_historico_salarial
+configuracoes_banco_inter
+conhecimento_gamificacao
+conhecimentos
+conquistas
+conteudo_obrigatorio
+conteudos_detalhados
+contextoRastreio
+eventos
+gatilhos_alto_ticket
+grupo_conteudo_obrigatorio
+grupos
+importacoes_bancarias
+key_results
+logs_geracao_ia
+metas_canal
+metas_canal_mensais
+metas_canal_old
+metas_mensais
+n8n_chat_histories
+nps_locations
+nps_responses
+nps_sectors
+objectives
+objetivos_aprendizado
+provas_configuracoes
+provas_conteudo
+provas_logs_ia
+provas_questoes
+provas_respostas_detalhadas
+provas_tentativas
+surveys
+topicos_conteudo
+transacoes_bancarias
+upload_usage
+uploads
+usuario_conquistas
+usuario_conteudo_obrigatorio_grupo
+usuario_pontuacao
+usuario_progresso
+usuarios
+usuarios_dashboard
+vendas_mercos
+vw_provas_estatisticas
+vw_provas_questoes_dificeis
+vw_provas_ranking_usuarios
+vw_wms_saldo_estoque_atual
+wms_movimentacoes
+wms_saldo_estoque
+--- COLUMNS FOR: ItensVenda ---
+Id (text)
+Codigo (integer)
+ProdutoReferencia (text)
+ProdutoBarras (text)
+ProdutoBundleCodigo (integer)
+VendaCodigo (integer)
+ProdutoCodigo (integer)
+PrecoUnitarioVenda (text)
+PrecoUnitarioCusto (text)
+EmbaladoParaPresente (boolean)
+ValorEmbalagemPresente (text)
+Quantidade (text)
+AtributosEspeciais (text)
+ItemNome (text)
+ItemDescontoPercentual (text)
+ItemDescontoValor (text)
+ItemValorBruto (text)
+ItemValorLiquido (text)
+Servico (boolean)
+CodigoVenda (integer)
+--- COLUMNS FOR: RecebiveisVendas ---
+id (text)
+codigo (text)
+idRecebivel (text)
+--- COLUMNS FOR: StatusVenda ---
+Id (text)
+VendaCodigo (integer)
+PedidoID (integer)
+StatusID (integer)
+NotificarCliente (boolean)
+NumeroObjeto (text)
+VendaStatusCodigo (integer)
+DescricaoStatus (text)
+Enviado (boolean)
+Data (timestamp without time zone)
+Hora (timestamp without time zone)
+LinkNfeConsulta (text)
+--- COLUMNS FOR: Venda ---
+Id (text)
+Codigo (integer)
+ClienteCodigo (integer)
+ClienteTipoPessoa (text)
+ClienteDocumento (text)
+TransportadoraCodigo (integer)
+TransportadoraNome (text)
+DataVenda (text)
+ValorTotal (text)
+ValorTotalBruto (text)
+ValorFrete (text)
+ValorDesconto (text)
+ValorComissao (text)
+Entrega (boolean)
+EntregaNome (text)
+EntregaEmail (text)
+NumeroObjeto (text)
+EntregaTelefone (text)
+EntregaLogradouro (text)
+EntregaLogradouroNumero (text)
+EntregaLogradouroComplemento (text)
+EntregaBairro (text)
+EntregaMunicipioNome (text)
+EntregaUnidadeFederativa (text)
+EntregaCEP (text)
+Observacoes (text)
+ObservacoesLoja (text)
+CodigoStatus (integer)
+DescricaoStatus (text)
+DataHoraStatus (text)
+PrevisaoEntrega (text)
+OrigemPedido (text)
+OrigemExterno (text)
+CodigoPedidoExterno (text)
+CodigoPedido (integer)
+CodigoNotaFiscal (integer)
+Usuario (integer)
+Empresa (integer)
+Orcamento (boolean)
+TipoVenda (text)
+DataEntrega (text)
+Cancelada (boolean)
+DataEnvio (text)
+NotaFiscalNumero (integer)
+DataColeta (text)
+FormasDePagamento (text)
+AvaliacaoGoogle (text)
+Volumes (integer)
+PesoLiquido (text)
+PrevisaoEntregaRastreio (text)
+PrevisaoEntregaRastreioAviso (text)
+LastMileRastreio (text)
+LastMileRastreioAviso (text)
+EntregueRastreio (text)
+EntregueRastreioAviso (text)
+AvaliacaoAviso (text)
+--- COLUMNS FOR: VendaAnymarket ---
+Id (text)
+type (text)
+event (text)
+content (jsonb)
+datahora (timestamp without time zone)
+--- COLUMNS FOR: vendas_mercos ---
+id (integer)
+data_emissao (date)
+pedido (integer)
+tag_cliente (character varying)
+nome_fantasia (character varying)
+razao_social (character varying)
+representada (character varying)
+colaborador (character varying)
+rede (character varying)
+valor_vendido (numeric)
+data_importacao (timestamp without time zone)
