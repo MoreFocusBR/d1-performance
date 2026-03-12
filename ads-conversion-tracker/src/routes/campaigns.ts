@@ -24,6 +24,7 @@ app.get('/performance', async (c) => {
     const origemFilter = c.req.query('origem');
     const aporteStartDate = c.req.query('aporte_start_date');
     const aporteEndDate = c.req.query('aporte_end_date');
+    const origemPedidoFilter = c.req.query('origem_pedido');
 
     let dateFilter = '';
     const params: any[] = [];
@@ -49,11 +50,21 @@ app.get('/performance', async (c) => {
       paramIndex += origens.length;
     }
 
+    let origemPedidoFilterSQL = '';
+    if (origemPedidoFilter) {
+      const origensPedido = origemPedidoFilter.split(',').map(o => o.trim());
+      const placeholders = origensPedido.map((_, i) => `$${paramIndex + i}`).join(', ');
+      origemPedidoFilterSQL = ` AND LOWER(v."OrigemPedido") IN (${placeholders})`;
+      params.push(...origensPedido.map(o => o.toLowerCase()));
+      paramIndex += origensPedido.length;
+    }
+
     // Query principal: performance por campanha e canal
     const campaignResult = await query(`
       SELECT
         r.first_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
         r.first_conversion->'conversion_origin'->>'source' AS origem,
+        v."OrigemPedido" AS origem_pedido,
         COUNT(v."Codigo") AS total_vendas,
         SUM(v."ValorTotal"::numeric) AS valor_total_vendas,
         MIN(v."DataVenda") AS primeira_venda,
@@ -69,8 +80,9 @@ app.get('/performance', async (c) => {
         AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
         ${dateFilter}
         ${origemFilterSQL}
+        ${origemPedidoFilterSQL}
       GROUP BY 
-        utm_campaign, origem
+        utm_campaign, origem, v."OrigemPedido"
       ORDER BY 
         valor_total_vendas DESC
     `, params);
@@ -161,6 +173,21 @@ app.get('/performance', async (c) => {
       ORDER BY origem
     `);
 
+    // Query de origens de pedido disponíveis (para filtro)
+    const origemPedidoResult = await query(`
+      SELECT DISTINCT 
+        v."OrigemPedido" AS origem_pedido
+      FROM 
+        "Venda" v
+      INNER JOIN 
+        rdstation_webhook_logs r 
+        ON LOWER(v."EntregaEmail") = LOWER(r.email)
+      WHERE 
+        v."Cancelada" = false
+        AND v."OrigemPedido" IS NOT NULL
+      ORDER BY origem_pedido
+    `);
+
     // Obter aportes agregados
     const aportes = await AporteService.getAggregated({
       data_inicio: aporteStartDate,
@@ -224,6 +251,7 @@ app.get('/performance', async (c) => {
       return {
         utm_campaign: row.utm_campaign,
         origem: row.origem || '(direct)',
+        origem_pedido: row.origem_pedido || 'Não informado',
         total_vendas: totalVendas,
         valor_total: valorTotal,
         total_aporte: aporte,
@@ -252,6 +280,7 @@ app.get('/performance', async (c) => {
       channels: channelSummary,
       campaigns,
       available_channels: channelsResult.rows.map(r => r.origem).filter(Boolean),
+      available_origem_pedido: origemPedidoResult.rows.map(r => r.origem_pedido).filter(Boolean),
       total_campaigns: campaigns.length
     });
   } catch (error) {
