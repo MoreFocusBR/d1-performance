@@ -761,6 +761,22 @@
             </div>
         </div>
 
+        <!-- FILTRO POR CANAL DA VENDA -->
+        <div class="card border-blue" id="origemPedidoFilterCard">
+            <div class="channel-header">
+                <div class="card-title" style="margin-bottom:0">Filtrar por Canal da Venda</div>
+                <div class="channel-actions">
+                    <button onclick="selectAllOrigemPedido()">Todos</button>
+                    <button onclick="clearAllOrigemPedido()">Limpar</button>
+                </div>
+            </div>
+            <div class="channel-tags" id="origemPedidoTags">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- KPIs -->
         <div class="kpi-grid" id="kpiGrid">
             <div class="kpi orange">
@@ -794,6 +810,21 @@
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#ccc;margin-bottom:8px">Valor Total (R$)</div>
                     <div class="chart-container"><canvas id="chartValorCanal"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PERFORMANCE POR CANAL DA VENDA - GRÁFICOS -->
+        <div class="card border-multi">
+            <div class="card-title">Distribuição por Canal da Venda</div>
+            <div class="charts-row">
+                <div>
+                    <div style="font-size:13px;font-weight:600;color:#ccc;margin-bottom:8px">Quantidade de Vendas</div>
+                    <div class="chart-container"><canvas id="chartOrigemPedidoVendas"></canvas></div>
+                </div>
+                <div>
+                    <div style="font-size:13px;font-weight:600;color:#ccc;margin-bottom:8px">Valor Total (R$)</div>
+                    <div class="chart-container"><canvas id="chartOrigemPedidoValor"></canvas></div>
                 </div>
             </div>
         </div>
