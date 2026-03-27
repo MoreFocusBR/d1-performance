@@ -17,7 +17,7 @@ export interface RDStationWebhookLead {
   opportunity: string;
   number_conversions: string;
   user: string | null;
-  first_conversion: Record<string, any> | null;
+  last_conversion: Record<string, any> | null;
   last_conversion: Record<string, any> | null;
   custom_fields: Record<string, any> | null;
   website: string | null;
@@ -115,7 +115,7 @@ export class RDStationWebhookService {
         `INSERT INTO rdstation_webhook_logs (
           rdstation_lead_id, email, name, company, job_title, bio,
           public_url, opportunity, number_conversions, lead_user,
-          first_conversion, last_conversion, custom_fields,
+          last_conversion, last_conversion, custom_fields,
           website, personal_phone, mobile_phone, city, estado,
           lead_stage, tags, fit_score, interest, raw_payload, status
         ) VALUES (
@@ -135,7 +135,7 @@ export class RDStationWebhookService {
           opportunity = EXCLUDED.opportunity,
           number_conversions = EXCLUDED.number_conversions,
           lead_user = EXCLUDED.lead_user,
-          first_conversion = EXCLUDED.first_conversion,
+          last_conversion = EXCLUDED.last_conversion,
           last_conversion = EXCLUDED.last_conversion,
           custom_fields = EXCLUDED.custom_fields,
           website = EXCLUDED.website,
@@ -161,7 +161,7 @@ export class RDStationWebhookService {
           lead.opportunity || null,
           lead.number_conversions || null,
           lead.user || null,
-          lead.first_conversion ? JSON.stringify(lead.first_conversion) : null,
+          lead.last_conversion ? JSON.stringify(lead.last_conversion) : null,
           lead.last_conversion ? JSON.stringify(lead.last_conversion) : null,
           lead.custom_fields ? JSON.stringify(lead.custom_fields) : null,
           lead.website || null,

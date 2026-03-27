@@ -1575,7 +1575,7 @@
                     <div class="ci-value green">${formatCurrency(ticket)}</div>
                     <div class="ci-sub">~ por pedido</div>
                 </div>
-                <button class="campaign-expand-btn" onclick="toggleCampaignDetails('${campaignKey}', '${c.utm_campaign}', '${c.origem}')">▼</button>
+                <button class="campaign-expand-btn" onclick="toggleCampaignDetails('${campaignKey}', '${c.utm_campaign}', '${c.origem}', '${c.origem_pedido}')">▼</button>
             </div>
             <div class="campaign-details" id="details-${campaignKey}">
                 <div class="orders-loading">
@@ -1587,7 +1587,7 @@
             });
         }
 
-        function toggleCampaignDetails(campaignKey, campaignName, origem) {
+        function toggleCampaignDetails(campaignKey, campaignName, origem, origemPedido) {
             const detailsElement = document.getElementById(`details-${campaignKey}`);
             const btnElement = document.querySelector(`[data-campaign-key="${campaignKey}"] .campaign-expand-btn`);
             
@@ -1597,25 +1597,14 @@
             } else {
                 detailsElement.classList.add('show');
                 btnElement.classList.add('expanded');
-                loadCampaignOrders(campaignKey, campaignName, origem);
+                loadCampaignOrders(campaignKey, campaignName, origem, origemPedido);
             }
         }
 
-        async function loadCampaignOrders(campaignKey, campaignName, origem) {
+        async function loadCampaignOrders(campaignKey, campaignName, origem, origemPedido) {
             const detailsElement = document.getElementById(`details-${campaignKey}`);
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
-            
-            // Extrair origem_pedido do elemento da campanha
-            const campaignElement = document.querySelector(`[data-campaign-key="${campaignKey}"]`);
-            const origemPedidoBadge = campaignElement.querySelector('[style*="background"]');
-            let origemPedido = '';
-            
-            // Procurar pela origem_pedido na segunda badge (Canal da Venda)
-            const badges = campaignElement.querySelectorAll('.source-badge');
-            if (badges.length > 1) {
-                origemPedido = badges[1].textContent.trim();
-            }
             
             try {
                 let url = `/api/campaigns/orders?utm_campaign=${encodeURIComponent(campaignName)}&origem=${encodeURIComponent(origem)}`;
@@ -1627,7 +1616,7 @@
                 const data = await res.json();
                 
                 if (!data.success || !data.orders || data.orders.length === 0) {
-                    detailsElement.innerHTML = '<p style="text-align:center;color:#666;padding:20px">Nenhum pedido encontrado para esta campanha</p>';
+                    detailsElement.innerHTML = '<p style="text-align:center;color:#666;padding:20px">Nenhum pedido encontrado para esta campanha no período selecionado</p>';
                     return;
                 }
                 

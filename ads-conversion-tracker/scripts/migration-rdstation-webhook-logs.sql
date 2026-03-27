@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS rdstation_webhook_logs (
     opportunity         VARCHAR(10),
     number_conversions  VARCHAR(20),
     lead_user           VARCHAR(255),
-    first_conversion    JSONB,
+    last_conversion    JSONB,
     last_conversion     JSONB,
     custom_fields       JSONB,
     website             VARCHAR(500),
@@ -60,7 +60,7 @@ COMMENT ON COLUMN rdstation_webhook_logs.public_url IS 'URL pública do lead na 
 COMMENT ON COLUMN rdstation_webhook_logs.opportunity IS 'Se o lead é uma oportunidade (true/false)';
 COMMENT ON COLUMN rdstation_webhook_logs.number_conversions IS 'Número de conversões do lead';
 COMMENT ON COLUMN rdstation_webhook_logs.lead_user IS 'Email do dono do lead na RD Station';
-COMMENT ON COLUMN rdstation_webhook_logs.first_conversion IS 'Dados da primeira conversão (JSON)';
+COMMENT ON COLUMN rdstation_webhook_logs.last_conversion IS 'Dados da primeira conversão (JSON)';
 COMMENT ON COLUMN rdstation_webhook_logs.last_conversion IS 'Dados da última conversão (JSON)';
 COMMENT ON COLUMN rdstation_webhook_logs.custom_fields IS 'Campos personalizados do lead (JSON)';
 COMMENT ON COLUMN rdstation_webhook_logs.website IS 'Site do lead';

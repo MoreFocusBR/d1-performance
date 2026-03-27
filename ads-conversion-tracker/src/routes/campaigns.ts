@@ -45,7 +45,7 @@ app.get('/performance', async (c) => {
     if (origemFilter) {
       const origens = origemFilter.split(',').map(o => o.trim());
       const placeholders = origens.map((_, i) => `$${paramIndex + i}`).join(', ');
-      origemFilterSQL = ` AND LOWER(r.first_conversion->'conversion_origin'->>'source') IN (${placeholders})`;
+      origemFilterSQL = ` AND LOWER(r.last_conversion->'conversion_origin'->>'source') IN (${placeholders})`;
       params.push(...origens.map(o => o.toLowerCase()));
       paramIndex += origens.length;
     }
@@ -62,8 +62,8 @@ app.get('/performance', async (c) => {
     // Query principal: performance por campanha e canal
     const campaignResult = await query(`
       SELECT
-        r.first_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
-        r.first_conversion->'conversion_origin'->>'source' AS origem,
+        r.last_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
+        r.last_conversion->'conversion_origin'->>'source' AS origem,
         v."OrigemPedido" AS origem_pedido,
         COUNT(v."Codigo") AS total_vendas,
         SUM(v."ValorTotal"::numeric) AS valor_total_vendas,
@@ -76,8 +76,8 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE 
         v."Cancelada" = false
-        AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-        AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
+        AND r.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
+        AND r.last_conversion->'conversion_origin'->>'campaign' != '(not set)'
         ${dateFilter}
         ${origemFilterSQL}
         ${origemPedidoFilterSQL}
@@ -115,8 +115,8 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE 
         v."Cancelada" = false
-        AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-        AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
+        AND r.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
+        AND r.last_conversion->'conversion_origin'->>'campaign' != '(not set)'
         ${totalsDateFilter}
     `, totalsParams);
 
@@ -143,8 +143,8 @@ app.get('/performance', async (c) => {
           ON LOWER(v."EntregaEmail") = LOWER(r.email)
         WHERE 
           v."Cancelada" = false
-          AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-          AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
+          AND r.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
+          AND r.last_conversion->'conversion_origin'->>'campaign' != '(not set)'
           AND v."DataVenda"::date >= $1::date
           AND v."DataVenda"::date <= $2::date
       `, [prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]]);
@@ -161,7 +161,7 @@ app.get('/performance', async (c) => {
     // Query de canais disponíveis (para filtro)
     const channelsResult = await query(`
       SELECT DISTINCT 
-        r.first_conversion->'conversion_origin'->>'source' AS origem
+        r.last_conversion->'conversion_origin'->>'source' AS origem
       FROM 
         "Venda" v
       INNER JOIN 
@@ -169,7 +169,7 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE 
         v."Cancelada" = false
-        AND r.first_conversion->'conversion_origin'->>'source' IS NOT NULL
+        AND r.last_conversion->'conversion_origin'->>'source' IS NOT NULL
       ORDER BY origem
     `);
 
@@ -194,13 +194,10 @@ app.get('/performance', async (c) => {
       data_fim: aporteEndDate
     });
 
-    // Criar mapa de aportes para lookup rápido
-    const aportesMap: Record<string, Record<string, number>> = {};
+    // Criar mapa de aportes para lookup rápido (apenas por campanha)
+    const aportesMap: Record<string, number> = {};
     aportes.forEach(a => {
-      if (!aportesMap[a.utm_campaign]) {
-        aportesMap[a.utm_campaign] = {};
-      }
-      aportesMap[a.utm_campaign][a.origem] = parseFloat(a.total_aporte);
+      aportesMap[a.utm_campaign] = parseFloat(a.total_aporte);
     });
 
     // Agrupar por canal para os gráficos
@@ -214,9 +211,9 @@ app.get('/performance', async (c) => {
       channelStats[channel].valor_total += parseFloat(row.valor_total_vendas);
       channelStats[channel].campanhas.add(row.utm_campaign);
 
-      // Somar aportes
-      if (aportesMap[row.utm_campaign] && aportesMap[row.utm_campaign][channel]) {
-        channelStats[channel].total_aporte += aportesMap[row.utm_campaign][channel];
+      // Somar aportes (agora apenas por campanha)
+      if (aportesMap[row.utm_campaign]) {
+        channelStats[channel].total_aporte += aportesMap[row.utm_campaign];
       }
     }
 
@@ -236,7 +233,7 @@ app.get('/performance', async (c) => {
       const valorTotal = parseFloat(row.valor_total_vendas);
       const primeiraVenda = row.primeira_venda;
       const ultimaVenda = row.ultima_venda;
-      
+
       let diasAtivo = 0;
       if (primeiraVenda && ultimaVenda) {
         diasAtivo = Math.ceil(
@@ -244,8 +241,8 @@ app.get('/performance', async (c) => {
         );
       }
 
-      // Obter aporte para esta campanha
-      const aporte = aportesMap[row.utm_campaign]?.[row.origem] || 0;
+      // Obter aporte para esta campanha (agora apenas por utm_campaign)
+      const aporte = aportesMap[row.utm_campaign] || 0;
       const roas = aporte > 0 ? valorTotal / aporte : 0;
 
       return {
@@ -320,8 +317,8 @@ app.get('/orders', async (c) => {
     }
 
     let whereClause = `
-      WHERE r.first_conversion->'conversion_origin'->>'campaign' = $1
-      AND r.first_conversion->'conversion_origin'->>'source' = $2
+      WHERE r.last_conversion->'conversion_origin'->>'campaign' = $1
+      AND r.last_conversion->'conversion_origin'->>'source' = $2
       AND v."Cancelada" = false
     `;
     const params: any[] = [utmCampaign, origem];

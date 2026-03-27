@@ -3,7 +3,6 @@ import { query } from '../utils/db';
 export interface Aporte {
   id?: number;
   utm_campaign: string;
-  origem: string;
   valor_aporte: number;
   data_aporte: string;
   descricao?: string;
@@ -19,12 +18,11 @@ export class AporteService {
   static async create(aporte: Aporte): Promise<Aporte> {
     const result = await query(
       `INSERT INTO performance_aporte_campanha 
-       (utm_campaign, origem, valor_aporte, data_aporte, descricao, created_by) 
-       VALUES ($1, $2, $3, $4, $5, $6)
+       (utm_campaign, valor_aporte, data_aporte, descricao, created_by) 
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
       [
         aporte.utm_campaign,
-        aporte.origem,
         aporte.valor_aporte,
         aporte.data_aporte,
         aporte.descricao || null,
@@ -41,13 +39,12 @@ export class AporteService {
   static async update(id: number, aporte: Aporte): Promise<Aporte> {
     const result = await query(
       `UPDATE performance_aporte_campanha 
-       SET utm_campaign = $1, origem = $2, valor_aporte = $3, 
-           data_aporte = $4, descricao = $5, updated_at = NOW()
-       WHERE id = $6
+       SET utm_campaign = $1, valor_aporte = $2, 
+           data_aporte = $3, descricao = $4, updated_at = NOW()
+       WHERE id = $5
        RETURNING *`,
       [
         aporte.utm_campaign,
-        aporte.origem,
         aporte.valor_aporte,
         aporte.data_aporte,
         aporte.descricao || null,
@@ -91,7 +88,6 @@ export class AporteService {
    */
   static async list(filters?: {
     utm_campaign?: string;
-    origem?: string;
     data_inicio?: string;
     data_fim?: string;
     limit?: number;
@@ -104,12 +100,6 @@ export class AporteService {
     if (filters?.utm_campaign) {
       whereClause += ` AND LOWER(utm_campaign) LIKE LOWER($${paramIndex})`;
       params.push(`%${filters.utm_campaign}%`);
-      paramIndex++;
-    }
-
-    if (filters?.origem) {
-      whereClause += ` AND LOWER(origem) LIKE LOWER($${paramIndex})`;
-      params.push(`%${filters.origem}%`);
       paramIndex++;
     }
 
@@ -156,12 +146,12 @@ export class AporteService {
   }
 
   /**
-   * Obter aportes agregados por campanha e origem
+   * Obter aportes agregados por campanha
    */
   static async getAggregated(filters?: {
     data_inicio?: string;
     data_fim?: string;
-  }): Promise<Array<{ utm_campaign: string; origem: string; total_aporte: number }>> {
+  }): Promise<Array<{ utm_campaign: string; total_aporte: number }>> {
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
     let paramIndex = 1;
@@ -181,11 +171,10 @@ export class AporteService {
     const result = await query(
       `SELECT 
         utm_campaign, 
-        origem, 
         SUM(valor_aporte) as total_aporte
        FROM performance_aporte_campanha
        ${whereClause}
-       GROUP BY utm_campaign, origem
+       GROUP BY utm_campaign
        ORDER BY total_aporte DESC`,
       params
     );

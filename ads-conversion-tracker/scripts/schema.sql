@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS rdstation_webhook_logs (
     opportunity         VARCHAR(10),
     number_conversions  VARCHAR(20),
     lead_user           VARCHAR(255),
-    first_conversion    JSONB,
+    last_conversion    JSONB,
     last_conversion     JSONB,
     custom_fields       JSONB,
     website             VARCHAR(500),
