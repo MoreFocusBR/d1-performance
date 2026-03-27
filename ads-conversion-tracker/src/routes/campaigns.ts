@@ -308,6 +308,7 @@ app.get('/orders', async (c) => {
   try {
     const utmCampaign = c.req.query('utm_campaign');
     const origem = c.req.query('origem');
+    const origemPedido = c.req.query('origem_pedido');
     const startDate = c.req.query('start_date');
     const endDate = c.req.query('end_date');
 
@@ -326,88 +327,12 @@ app.get('/orders', async (c) => {
     const params: any[] = [utmCampaign, origem];
     let paramIndex = 3;
 
-    if (startDate) {
-      whereClause += ` AND v."DataVenda"::date >= $${paramIndex}::date`;
-      params.push(startDate);
+    // Adicionar filtro de origem_pedido se fornecido
+    if (origemPedido) {
+      whereClause += ` AND LOWER(v."OrigemPedido") = $${paramIndex}`;
+      params.push(origemPedido.toLowerCase());
       paramIndex++;
     }
-    if (endDate) {
-      whereClause += ` AND v."DataVenda"::date <= $${paramIndex}::date`;
-      params.push(endDate);
-      paramIndex++;
-    }
-
-    const ordersResult = await query(`
-      SELECT
-        v."Codigo" AS codigo,
-        v."EntregaEmail" AS email,
-        v."DataVenda" AS data_venda,
-        v."ValorTotal" AS valor_total,
-        v."OrigemPedido" AS origem_pedido,
-        v."Cancelada" AS cancelada
-      FROM 
-        "Venda" v
-      INNER JOIN 
-        rdstation_webhook_logs r 
-        ON LOWER(v."EntregaEmail") = LOWER(r.email)
-      ${whereClause}
-      ORDER BY v."DataVenda" DESC
-      LIMIT 100
-    `, params);
-
-    return c.json({
-      success: true,
-      orders: ordersResult.rows.map(row => ({
-        codigo: row.codigo,
-        email: row.email,
-        data_venda: row.data_venda,
-        valor_total: parseFloat(row.valor_total) || 0,
-        origem_pedido: row.origem_pedido || 'Não informado',
-        cancelada: row.cancelada
-      }))
-    });
-  } catch (error) {
-    console.error('❌ [Campaigns Orders API] Erro:', error);
-    return c.json({
-      success: false,
-      error: 'Erro ao buscar pedidos da campanha',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }, 500);
-  }
-});
-
-/**
- * GET /api/campaigns/orders
- * 
- * Retorna os pedidos/vendas vinculados a uma campanha específica.
- * 
- * Query Parameters:
- *   - utm_campaign: Nome da campanha
- *   - origem: Canal/origem da campanha
- *   - start_date: Data início (YYYY-MM-DD)
- *   - end_date: Data fim (YYYY-MM-DD)
- */
-app.get('/orders', async (c) => {
-  try {
-    const utmCampaign = c.req.query('utm_campaign');
-    const origem = c.req.query('origem');
-    const startDate = c.req.query('start_date');
-    const endDate = c.req.query('end_date');
-
-    if (!utmCampaign || !origem) {
-      return c.json({
-        success: false,
-        error: 'utm_campaign e origem são obrigatórios'
-      }, 400);
-    }
-
-    let whereClause = `
-      WHERE r.first_conversion->'conversion_origin'->>'campaign' = $1
-      AND r.first_conversion->'conversion_origin'->>'source' = $2
-      AND v."Cancelada" = false
-    `;
-    const params: any[] = [utmCampaign, origem];
-    let paramIndex = 3;
 
     if (startDate) {
       whereClause += ` AND v."DataVenda"::date >= $${paramIndex}::date`;

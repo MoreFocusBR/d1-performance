@@ -1606,8 +1606,23 @@
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             
+            // Extrair origem_pedido do elemento da campanha
+            const campaignElement = document.querySelector(`[data-campaign-key="${campaignKey}"]`);
+            const origemPedidoBadge = campaignElement.querySelector('[style*="background"]');
+            let origemPedido = '';
+            
+            // Procurar pela origem_pedido na segunda badge (Canal da Venda)
+            const badges = campaignElement.querySelectorAll('.source-badge');
+            if (badges.length > 1) {
+                origemPedido = badges[1].textContent.trim();
+            }
+            
             try {
-                let url = `/api/campaigns/orders?utm_campaign=${encodeURIComponent(campaignName)}&origem=${encodeURIComponent(origem)}&start_date=${startDate}&end_date=${endDate}`;
+                let url = `/api/campaigns/orders?utm_campaign=${encodeURIComponent(campaignName)}&origem=${encodeURIComponent(origem)}`;
+                if (origemPedido) {
+                    url += `&origem_pedido=${encodeURIComponent(origemPedido)}`;
+                }
+                url += `&start_date=${startDate}&end_date=${endDate}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
@@ -1620,6 +1635,7 @@
                     <table class="orders-table">
                         <thead>
                             <tr>
+                                <th>Nº Pedido</th>
                                 <th>Email</th>
                                 <th>Data</th>
                                 <th>Valor</th>
@@ -1635,10 +1651,11 @@
                     const statusText = order.cancelada ? 'Cancelado' : 'Confirmado';
                     html += `
                         <tr>
+                            <td style="font-weight:600;color:#FF6B35">${order.codigo || '--'}</td>
                             <td>${order.email || '--'}</td>
                             <td class="order-date">${formatDate(order.data_venda)}</td>
                             <td class="order-value">${formatCurrency(order.valor_total)}</td>
-                            <td>${order.origem_pedido || 'Não informado'}</td>
+                            <td>${order.origem_pedido || 'Nao informado'}</td>
                             <td><span style="color:${statusColor};font-weight:600">${statusText}</span></td>
                         </tr>
                     `;
