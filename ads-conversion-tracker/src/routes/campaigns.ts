@@ -194,13 +194,10 @@ app.get('/performance', async (c) => {
       data_fim: aporteEndDate
     });
 
-    // Criar mapa de aportes para lookup rápido
-    const aportesMap: Record<string, Record<string, number>> = {};
+    // Criar mapa de aportes para lookup rápido (apenas por campanha)
+    const aportesMap: Record<string, number> = {};
     aportes.forEach(a => {
-      if (!aportesMap[a.utm_campaign]) {
-        aportesMap[a.utm_campaign] = {};
-      }
-      aportesMap[a.utm_campaign][a.origem] = parseFloat(a.total_aporte);
+      aportesMap[a.utm_campaign] = parseFloat(a.total_aporte);
     });
 
     // Agrupar por canal para os gráficos
@@ -214,9 +211,9 @@ app.get('/performance', async (c) => {
       channelStats[channel].valor_total += parseFloat(row.valor_total_vendas);
       channelStats[channel].campanhas.add(row.utm_campaign);
 
-      // Somar aportes
-      if (aportesMap[row.utm_campaign] && aportesMap[row.utm_campaign][channel]) {
-        channelStats[channel].total_aporte += aportesMap[row.utm_campaign][channel];
+      // Somar aportes (agora apenas por campanha)
+      if (aportesMap[row.utm_campaign]) {
+        channelStats[channel].total_aporte += aportesMap[row.utm_campaign];
       }
     }
 
@@ -244,8 +241,8 @@ app.get('/performance', async (c) => {
         );
       }
 
-      // Obter aporte para esta campanha
-      const aporte = aportesMap[row.utm_campaign]?.[row.origem] || 0;
+      // Obter aporte para esta campanha (agora apenas por utm_campaign)
+      const aporte = aportesMap[row.utm_campaign] || 0;
       const roas = aporte > 0 ? valorTotal / aporte : 0;
 
       return {
