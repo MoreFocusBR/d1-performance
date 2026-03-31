@@ -231,7 +231,6 @@ async function loadAportes() {
         tbody.innerHTML = data.aportes.map(a => `
             <tr>
                 <td><strong>${a.utm_campaign}</strong></td>
-                <td>${a.origem}</td>
                 <td class="currency">${formatCurrency(a.valor_aporte)}</td>
                 <td class="date">${formatDate(a.data_aporte)}</td>
                 <td>${a.descricao || '-'}</td>
@@ -253,7 +252,6 @@ document.getElementById('aportForm').addEventListener('submit', async (e) => {
 
     const aporte = {
         utm_campaign: document.getElementById('utm_campaign').value.trim(),
-        origem: document.getElementById('origem').value.trim(),
         valor_aporte: parseFloat(document.getElementById('valor_aporte').value),
         data_aporte: document.getElementById('data_aporte').value,
         descricao: document.getElementById('descricao').value.trim() || null,
@@ -297,7 +295,6 @@ async function editAporte(id) {
         const a = data.aporte;
         document.getElementById('editId').value = id;
         document.getElementById('edit_utm_campaign').value = a.utm_campaign;
-        document.getElementById('edit_origem').value = a.origem;
         document.getElementById('edit_valor_aporte').value = a.valor_aporte;
         document.getElementById('edit_data_aporte').value = a.data_aporte;
         document.getElementById('edit_descricao').value = a.descricao || '';
@@ -316,7 +313,6 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
     const id = document.getElementById('editId').value;
     const aporte = {
         utm_campaign: document.getElementById('edit_utm_campaign').value.trim(),
-        origem: document.getElementById('edit_origem').value.trim(),
         valor_aporte: parseFloat(document.getElementById('edit_valor_aporte').value),
         data_aporte: document.getElementById('edit_data_aporte').value,
         descricao: document.getElementById('edit_descricao').value.trim() || null

@@ -75,8 +75,8 @@ export async function runAutoMigrations(): Promise<void> {
         opportunity         VARCHAR(10),
         number_conversions  VARCHAR(20),
         lead_user           VARCHAR(255),
-        last_conversion    JSONB,
-        last_conversion     JSONB,
+        first_conversion    JSONB,
+        first_conversion     JSONB,
         custom_fields       JSONB,
         website             VARCHAR(500),
         personal_phone      VARCHAR(50),
@@ -108,22 +108,39 @@ export async function runAutoMigrations(): Promise<void> {
       CREATE TABLE IF NOT EXISTS performance_aporte_campanha (
         id                  SERIAL PRIMARY KEY,
         utm_campaign        VARCHAR(255) NOT NULL,
-        origem              VARCHAR(100) NOT NULL,
         valor_aporte        NUMERIC(15, 2) NOT NULL,
         data_aporte         DATE NOT NULL,
         descricao           TEXT,
         created_by          VARCHAR(255),
         created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        UNIQUE(utm_campaign, origem, data_aporte)
+        UNIQUE(utm_campaign, data_aporte)
       )
     `);
 
     // Criar índices para performance_aporte_campanha
     await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_utm ON performance_aporte_campanha (utm_campaign)`);
-    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_origem ON performance_aporte_campanha (origem)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_data ON performance_aporte_campanha (data_aporte DESC)`);
-    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_combo ON performance_aporte_campanha (utm_campaign, origem, data_aporte)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_combo ON performance_aporte_campanha (utm_campaign, data_aporte)`);
+
+    // ============================================
+    // Migrações adicionais: Alterações em tabelas existentes
+    // ============================================
+    
+    // Remover coluna origem e recriar unicity
+    await query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'performance_aporte_campanha' AND column_name = 'origem'
+        ) THEN
+          -- Drop column using CASCADE drops dependent constraints (like the old UNIQUE constraint)
+          ALTER TABLE performance_aporte_campanha DROP COLUMN origem CASCADE;
+          ALTER TABLE performance_aporte_campanha ADD CONSTRAINT performance_aporte_campanha_utm_campaign_data_aporte_key UNIQUE(utm_campaign, data_aporte);
+        END IF;
+      END $$
+    `);
 
     console.log('✅ [Migrations] Todas as tabelas verificadas/criadas com sucesso');
   } catch (error) {

@@ -13,16 +13,16 @@ async function check() {
         await client.connect();
         console.log('--- SAMPLE CONVERSION DATA ---');
         const res = await client.query(`
-        SELECT last_conversion, last_conversion 
+        SELECT first_conversion, first_conversion 
         FROM rdstation_webhook_logs 
-        WHERE last_conversion IS NOT NULL OR last_conversion IS NOT NULL 
+        WHERE first_conversion IS NOT NULL OR first_conversion IS NOT NULL 
         LIMIT 5;
     `);
 
         res.rows.forEach((r, i) => {
             console.log(`Row ${i + 1}:`);
-            console.log('First:', JSON.stringify(r.last_conversion));
-            console.log('Last:', JSON.stringify(r.last_conversion));
+            console.log('First:', JSON.stringify(r.first_conversion));
+            console.log('Last:', JSON.stringify(r.first_conversion));
         });
 
         await client.end();
