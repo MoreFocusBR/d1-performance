@@ -82,7 +82,7 @@ app.get('/performance', async (c) => {
         ${origemFilterSQL}
         ${origemPedidoFilterSQL}
       GROUP BY 
-        utm_campaign, origem, v."OrigemPedido"
+        1, 2, 3
       ORDER BY 
         valor_total_vendas DESC
     `, params);
@@ -170,7 +170,7 @@ app.get('/performance', async (c) => {
       WHERE 
         v."Cancelada" = false
         AND r.first_conversion->'conversion_origin'->>'source' IS NOT NULL
-      ORDER BY origem
+      ORDER BY 1
     `);
 
     // Query de origens de pedido disponíveis (para filtro)
@@ -185,7 +185,7 @@ app.get('/performance', async (c) => {
       WHERE 
         v."Cancelada" = false
         AND v."OrigemPedido" IS NOT NULL
-      ORDER BY origem_pedido
+      ORDER BY 1
     `);
 
     // Obter aportes agregados
