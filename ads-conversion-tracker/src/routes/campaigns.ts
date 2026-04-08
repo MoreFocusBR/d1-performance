@@ -45,7 +45,7 @@ app.get('/performance', async (c) => {
     if (origemFilter) {
       const origens = origemFilter.split(',').map(o => o.trim());
       const placeholders = origens.map((_, i) => `$${paramIndex + i}`).join(', ');
-      origemFilterSQL = ` AND LOWER(r.last_conversion->'conversion_origin'->>'source') IN (${placeholders})`;
+      origemFilterSQL = ` AND LOWER(r.first_conversion->'conversion_origin'->>'source') IN (${placeholders})`;
       params.push(...origens.map(o => o.toLowerCase()));
       paramIndex += origens.length;
     }
@@ -62,8 +62,8 @@ app.get('/performance', async (c) => {
     // Query principal: performance por campanha e canal
     const campaignResult = await query(`
       SELECT
-        r.last_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
-        r.last_conversion->'conversion_origin'->>'source' AS origem,
+        r.first_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
+        r.first_conversion->'conversion_origin'->>'source' AS origem,
         v."OrigemPedido" AS origem_pedido,
         COUNT(v."Codigo") AS total_vendas,
         SUM(v."ValorTotal"::numeric) AS valor_total_vendas,
@@ -76,13 +76,13 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE 
         v."Cancelada" = false
-        AND r.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-        AND r.last_conversion->'conversion_origin'->>'campaign' != '(not set)'
+        AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
+        AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
         ${dateFilter}
         ${origemFilterSQL}
         ${origemPedidoFilterSQL}
       GROUP BY 
-        utm_campaign, origem, v."OrigemPedido"
+        1, 2, 3
       ORDER BY 
         valor_total_vendas DESC
     `, params);
@@ -115,8 +115,8 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE 
         v."Cancelada" = false
-        AND r.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-        AND r.last_conversion->'conversion_origin'->>'campaign' != '(not set)'
+        AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
+        AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
         ${totalsDateFilter}
     `, totalsParams);
 
@@ -143,8 +143,8 @@ app.get('/performance', async (c) => {
           ON LOWER(v."EntregaEmail") = LOWER(r.email)
         WHERE 
           v."Cancelada" = false
-          AND r.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-          AND r.last_conversion->'conversion_origin'->>'campaign' != '(not set)'
+          AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
+          AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
           AND v."DataVenda"::date >= $1::date
           AND v."DataVenda"::date <= $2::date
       `, [prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]]);
@@ -161,7 +161,7 @@ app.get('/performance', async (c) => {
     // Query de canais disponíveis (para filtro)
     const channelsResult = await query(`
       SELECT DISTINCT 
-        r.last_conversion->'conversion_origin'->>'source' AS origem
+        r.first_conversion->'conversion_origin'->>'source' AS origem
       FROM 
         "Venda" v
       INNER JOIN 
@@ -169,8 +169,8 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE 
         v."Cancelada" = false
-        AND r.last_conversion->'conversion_origin'->>'source' IS NOT NULL
-      ORDER BY origem
+        AND r.first_conversion->'conversion_origin'->>'source' IS NOT NULL
+      ORDER BY 1
     `);
 
     // Query de origens de pedido disponíveis (para filtro)
@@ -185,7 +185,7 @@ app.get('/performance', async (c) => {
       WHERE 
         v."Cancelada" = false
         AND v."OrigemPedido" IS NOT NULL
-      ORDER BY origem_pedido
+      ORDER BY 1
     `);
 
     // Obter aportes agregados
@@ -317,8 +317,8 @@ app.get('/orders', async (c) => {
     }
 
     let whereClause = `
-      WHERE r.last_conversion->'conversion_origin'->>'campaign' = $1
-      AND r.last_conversion->'conversion_origin'->>'source' = $2
+      WHERE r.first_conversion->'conversion_origin'->>'campaign' = $1
+      AND r.first_conversion->'conversion_origin'->>'source' = $2
       AND v."Cancelada" = false
     `;
     const params: any[] = [utmCampaign, origem];

@@ -10,7 +10,6 @@ const app = new Hono();
 app.get('/', async (c) => {
   try {
     const utm_campaign = c.req.query('utm_campaign');
-    const origem = c.req.query('origem');
     const data_inicio = c.req.query('data_inicio');
     const data_fim = c.req.query('data_fim');
     const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 100;
@@ -18,7 +17,6 @@ app.get('/', async (c) => {
 
     const result = await AporteService.list({
       utm_campaign,
-      origem,
       data_inicio,
       data_fim,
       limit,
@@ -44,7 +42,7 @@ app.get('/', async (c) => {
 
 /**
  * GET /api/aportes/aggregated
- * Obter aportes agregados por campanha e origem
+ * Obter aportes agregados por campanha
  */
 app.get('/aggregated', async (c) => {
   try {
@@ -107,16 +105,15 @@ app.post('/', async (c) => {
     const body = await c.req.json();
 
     // Validar campos obrigatórios
-    if (!body.utm_campaign || !body.origem || body.valor_aporte === undefined || !body.data_aporte) {
+    if (!body.utm_campaign || body.valor_aporte === undefined || !body.data_aporte) {
       return c.json({
         success: false,
-        error: 'Campos obrigatórios: utm_campaign, origem, valor_aporte, data_aporte'
+        error: 'Campos obrigatórios: utm_campaign, valor_aporte, data_aporte'
       }, 400);
     }
 
     const aporte = await AporteService.create({
       utm_campaign: body.utm_campaign.trim(),
-      origem: body.origem.trim(),
       valor_aporte: parseFloat(body.valor_aporte),
       data_aporte: body.data_aporte,
       descricao: body.descricao?.trim() || null,
@@ -132,12 +129,12 @@ app.post('/', async (c) => {
     }, 201);
   } catch (error) {
     console.error('❌ [Aportes API] Erro ao criar:', error);
-    
+
     // Verificar se é erro de constraint (UNIQUE)
     if (error instanceof Error && error.message.includes('unique')) {
       return c.json({
         success: false,
-        error: 'Já existe um aporte para esta campanha, origem e data'
+        error: 'Já existe um aporte para esta campanha e data'
       }, 409);
     }
 
@@ -159,16 +156,15 @@ app.put('/:id', async (c) => {
     const body = await c.req.json();
 
     // Validar campos obrigatórios
-    if (!body.utm_campaign || !body.origem || body.valor_aporte === undefined || !body.data_aporte) {
+    if (!body.utm_campaign || body.valor_aporte === undefined || !body.data_aporte) {
       return c.json({
         success: false,
-        error: 'Campos obrigatórios: utm_campaign, origem, valor_aporte, data_aporte'
+        error: 'Campos obrigatórios: utm_campaign, valor_aporte, data_aporte'
       }, 400);
     }
 
     const aporte = await AporteService.update(id, {
       utm_campaign: body.utm_campaign.trim(),
-      origem: body.origem.trim(),
       valor_aporte: parseFloat(body.valor_aporte),
       data_aporte: body.data_aporte,
       descricao: body.descricao?.trim() || null

@@ -13,14 +13,14 @@ async function check() {
         await client.connect();
         console.log('--- RELEVANT CONVERSIONS ---');
         const res = await client.query(`
-        SELECT last_conversion->>'source' as source, 
-               last_conversion->>'medium' as medium, 
-               last_conversion->>'campaign' as campaign
+        SELECT first_conversion->>'source' as source, 
+               first_conversion->>'medium' as medium, 
+               first_conversion->>'campaign' as campaign
         FROM rdstation_webhook_logs 
-        WHERE (last_conversion->>'source' ILIKE '%google%' 
-           OR last_conversion->>'source' ILIKE '%facebook%'
-           OR last_conversion->>'source' ILIKE '%meta%'
-           OR last_conversion->>'source' ILIKE '%instagram%')
+        WHERE (first_conversion->>'source' ILIKE '%google%' 
+           OR first_conversion->>'source' ILIKE '%facebook%'
+           OR first_conversion->>'source' ILIKE '%meta%'
+           OR first_conversion->>'source' ILIKE '%instagram%')
         LIMIT 10;
     `);
 
