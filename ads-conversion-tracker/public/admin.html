@@ -828,6 +828,10 @@
                     <input type="date" class="date-input" id="startDate">
                     <span class="date-label">até</span>
                     <input type="date" class="date-input" id="endDate">
+                    <select class="date-input" id="conversionType" title="Tipo de conversão">
+                        <option value="last" selected>Last conversion</option>
+                        <option value="first">First conversion</option>
+                    </select>
                 </div>
                 <div class="quick-filters">
                     <button class="quick-btn" onclick="setQuickFilter('today')">Hoje</button>
@@ -1015,6 +1019,7 @@
         let chartDonut = null;
         let chartOrigemPedidoVendas = null;
         let chartOrigemPedidoValor = null;
+        let lastLoadedConversionType = 'last';
 
         const CHANNEL_COLORS = {
             'facebook': { bg: '#2266cc55', border: '#2266cc', text: '#6699ff' },
@@ -1061,11 +1066,13 @@
             const today = new Date();
             document.getElementById('startDate').value = formatDateInput(today);
             document.getElementById('endDate').value = formatDateInput(today);
+            document.getElementById('conversionType').value = 'last';
 
             document.getElementById('startDate').addEventListener('change', loadDashboard);
             document.getElementById('endDate').addEventListener('change', loadDashboard);
             document.getElementById('aporteStartDate').addEventListener('change', loadDashboard);
             document.getElementById('aporteEndDate').addEventListener('change', loadDashboard);
+            document.getElementById('conversionType').addEventListener('change', loadDashboard);
 
             setQuickFilter('thisMonth');
         }
@@ -1197,15 +1204,23 @@
             const endDate = document.getElementById('endDate').value;
             const aporteStartDate = document.getElementById('aporteStartDate').value;
             const aporteEndDate = document.getElementById('aporteEndDate').value;
+            const conversionType = document.getElementById('conversionType').value || 'last';
+            const conversionTypeChanged = conversionType !== lastLoadedConversionType;
 
             if (!startDate || !endDate) return;
 
+            if (conversionTypeChanged) {
+                selectedChannels.clear();
+                selectedOrigemPedido.clear();
+            }
+
             try {
                 let url = `/api/campaigns/performance?start_date=${startDate}&end_date=${endDate}`;
+                url += `&conversion_type=${encodeURIComponent(conversionType)}`;
                 if (aporteStartDate) url += `&aporte_start_date=${aporteStartDate}`;
                 if (aporteEndDate) url += `&aporte_end_date=${aporteEndDate}`;
-                if (selectedChannels.size > 0) url += `&origem=${Array.from(selectedChannels).join(',')}`;
-                if (selectedOrigemPedido.size > 0) url += `&origem_pedido=${Array.from(selectedOrigemPedido).join(',')}`;
+                if (!conversionTypeChanged && selectedChannels.size > 0) url += `&origem=${Array.from(selectedChannels).join(',')}`;
+                if (!conversionTypeChanged && selectedOrigemPedido.size > 0) url += `&origem_pedido=${Array.from(selectedOrigemPedido).join(',')}`;
                 const res = await fetch(url);
                 const data = await res.json();
 
@@ -1231,6 +1246,7 @@
                 renderOrigemPedidoTags();
 
                 renderFilteredData();
+                lastLoadedConversionType = conversionType;
 
                 // Update timestamp
                 document.getElementById('lastUpdate').textContent = 'Atualizado em: ' + new Date().toLocaleTimeString('pt-BR');
@@ -1605,6 +1621,7 @@
             const detailsElement = document.getElementById(`details-${campaignKey}`);
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
+            const conversionType = document.getElementById('conversionType').value || 'last';
             
             try {
                 let url = `/api/campaigns/orders?utm_campaign=${encodeURIComponent(campaignName)}&origem=${encodeURIComponent(origem)}`;
@@ -1612,6 +1629,7 @@
                     url += `&origem_pedido=${encodeURIComponent(origemPedido)}`;
                 }
                 url += `&start_date=${startDate}&end_date=${endDate}`;
+                url += `&conversion_type=${encodeURIComponent(conversionType)}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
