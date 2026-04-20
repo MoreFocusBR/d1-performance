@@ -76,7 +76,7 @@ export async function runAutoMigrations(): Promise<void> {
         number_conversions  VARCHAR(20),
         lead_user           VARCHAR(255),
         first_conversion    JSONB,
-        first_conversion     JSONB,
+        last_conversion     JSONB,
         custom_fields       JSONB,
         website             VARCHAR(500),
         personal_phone      VARCHAR(50),
