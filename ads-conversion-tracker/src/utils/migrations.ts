@@ -100,6 +100,38 @@ export async function runAutoMigrations(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_email ON rdstation_webhook_logs (email)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_received_at ON rdstation_webhook_logs (received_at DESC)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_opportunity ON rdstation_webhook_logs (opportunity)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_email_lower ON rdstation_webhook_logs (LOWER(email))`);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_first_campaign_source
+      ON rdstation_webhook_logs (
+        (first_conversion->'conversion_origin'->>'campaign'),
+        (first_conversion->'conversion_origin'->>'source')
+      )
+      WHERE (first_conversion->'conversion_origin'->>'campaign') IS NOT NULL
+      AND (first_conversion->'conversion_origin'->>'campaign') != '(not set)'
+    `);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_last_campaign_source
+      ON rdstation_webhook_logs (
+        (last_conversion->'conversion_origin'->>'campaign'),
+        (last_conversion->'conversion_origin'->>'source')
+      )
+      WHERE (last_conversion->'conversion_origin'->>'campaign') IS NOT NULL
+      AND (last_conversion->'conversion_origin'->>'campaign') != '(not set)'
+    `);
+
+    // Índices para acelerar joins/filtros de campanhas na tabela Venda (quando existir)
+    await query(`
+      DO $$
+      BEGIN
+        IF to_regclass('"Venda"') IS NOT NULL THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_venda_entrega_email_lower ON "Venda" (LOWER("EntregaEmail"))';
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_venda_data_venda ON "Venda" ("DataVenda")';
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_venda_origem_pedido_lower ON "Venda" (LOWER("OrigemPedido"))';
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_venda_data_email_not_cancelada ON "Venda" ("DataVenda", LOWER("EntregaEmail")) WHERE "Cancelada" = false';
+        END IF;
+      END $$;
+    `);
 
     // ============================================
     // Criar tabela performance_aporte_campanha

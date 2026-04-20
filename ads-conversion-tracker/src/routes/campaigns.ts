@@ -4,18 +4,50 @@ import { AporteService } from '../services/AporteService';
 
 const app = new Hono();
 
+function resolveConversionField(conversionTypeRaw?: string) {
+  const conversionType = conversionTypeRaw === 'first' ? 'first' : 'last';
+  const conversionField = conversionType === 'first' ? 'first_conversion' : 'last_conversion';
+  return { conversionType, conversionField };
+}
+
+function buildVendaDateFilter(
+  startDate?: string,
+  endDate?: string,
+  initialParamIndex = 1,
+  column = `v."DataVenda"`
+) {
+  let sql = '';
+  const params: any[] = [];
+  let paramIndex = initialParamIndex;
+
+  if (startDate) {
+    sql += ` AND (${column})::date >= $${paramIndex}::date`;
+    params.push(startDate);
+    paramIndex++;
+  }
+
+  if (endDate) {
+    sql += ` AND (${column})::date <= $${paramIndex}::date`;
+    params.push(endDate);
+    paramIndex++;
+  }
+
+  return { sql, params, nextParamIndex: paramIndex };
+}
+
 /**
  * GET /api/campaigns/performance
- * 
+ *
  * Retorna dados de performance das campanhas cruzando vendas com leads da RD Station.
  * Aceita filtros de data de vendas e data de aportes.
- * 
+ *
  * Query Parameters:
  *   - start_date: Data início vendas (YYYY-MM-DD)
  *   - end_date: Data fim vendas (YYYY-MM-DD)
  *   - origem: Filtrar por canal/origem específico (pode ser múltiplo, separado por vírgula)
  *   - aporte_start_date: Data início aportes (YYYY-MM-DD)
  *   - aporte_end_date: Data fim aportes (YYYY-MM-DD)
+ *   - conversion_type: Tipo de conversão (first|last). Padrão: last
  */
 app.get('/performance', async (c) => {
   try {
@@ -25,27 +57,21 @@ app.get('/performance', async (c) => {
     const aporteStartDate = c.req.query('aporte_start_date');
     const aporteEndDate = c.req.query('aporte_end_date');
     const origemPedidoFilter = c.req.query('origem_pedido');
+    const { conversionType, conversionField } = resolveConversionField(c.req.query('conversion_type'));
 
-    let dateFilter = '';
-    const params: any[] = [];
-    let paramIndex = 1;
+    const campaignExpr = `r.${conversionField}->'conversion_origin'->>'campaign'`;
+    const sourceExpr = `r.${conversionField}->'conversion_origin'->>'source'`;
 
-    if (startDate) {
-      dateFilter += ` AND v."DataVenda"::date >= $${paramIndex}::date`;
-      params.push(startDate);
-      paramIndex++;
-    }
-    if (endDate) {
-      dateFilter += ` AND v."DataVenda"::date <= $${paramIndex}::date`;
-      params.push(endDate);
-      paramIndex++;
-    }
+    const dateFilterResult = buildVendaDateFilter(startDate, endDate, 1);
+    const dateFilter = dateFilterResult.sql;
+    const params: any[] = [...dateFilterResult.params];
+    let paramIndex = dateFilterResult.nextParamIndex;
 
     let origemFilterSQL = '';
     if (origemFilter) {
       const origens = origemFilter.split(',').map(o => o.trim());
       const placeholders = origens.map((_, i) => `$${paramIndex + i}`).join(', ');
-      origemFilterSQL = ` AND LOWER(r.first_conversion->'conversion_origin'->>'source') IN (${placeholders})`;
+      origemFilterSQL = ` AND LOWER(${sourceExpr}) IN (${placeholders})`;
       params.push(...origens.map(o => o.toLowerCase()));
       paramIndex += origens.length;
     }
@@ -59,69 +85,58 @@ app.get('/performance', async (c) => {
       paramIndex += origensPedido.length;
     }
 
-    // Query principal: performance por campanha e canal
-    const campaignResult = await query(`
+    const campaignPromise = query(`
       SELECT
-        r.first_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
-        r.first_conversion->'conversion_origin'->>'source' AS origem,
+        ${campaignExpr} AS utm_campaign,
+        ${sourceExpr} AS origem,
         v."OrigemPedido" AS origem_pedido,
         COUNT(v."Codigo") AS total_vendas,
         SUM(v."ValorTotal"::numeric) AS valor_total_vendas,
         MIN(v."DataVenda") AS primeira_venda,
         MAX(v."DataVenda") AS ultima_venda
-      FROM 
+      FROM
         "Venda" v
-      INNER JOIN 
-        rdstation_webhook_logs r 
+      INNER JOIN
+        rdstation_webhook_logs r
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
-      WHERE 
+      WHERE
         v."Cancelada" = false
-        AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-        AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
+        AND ${campaignExpr} IS NOT NULL
+        AND ${campaignExpr} != '(not set)'
         ${dateFilter}
         ${origemFilterSQL}
         ${origemPedidoFilterSQL}
-      GROUP BY 
+      GROUP BY
         1, 2, 3
-      ORDER BY 
+      ORDER BY
         valor_total_vendas DESC
     `, params);
 
-    // Query de totais gerais (KPIs)
-    const totalsParams: any[] = [];
-    let totalsDateFilter = '';
-    let totalsParamIndex = 1;
+    const totalsDateFilterResult = buildVendaDateFilter(startDate, endDate, 1);
+    const totalsDateFilter = totalsDateFilterResult.sql;
+    const totalsParams = totalsDateFilterResult.params;
 
-    if (startDate) {
-      totalsDateFilter += ` AND v."DataVenda"::date >= $${totalsParamIndex}::date`;
-      totalsParams.push(startDate);
-      totalsParamIndex++;
-    }
-    if (endDate) {
-      totalsDateFilter += ` AND v."DataVenda"::date <= $${totalsParamIndex}::date`;
-      totalsParams.push(endDate);
-      totalsParamIndex++;
-    }
-
-    const totalsResult = await query(`
+    const totalsPromise = query(`
       SELECT
         COUNT(v."Codigo") AS total_vendas,
         COALESCE(SUM(v."ValorTotal"::numeric), 0) AS valor_total,
         COALESCE(AVG(v."ValorTotal"::numeric), 0) AS ticket_medio
-      FROM 
+      FROM
         "Venda" v
-      INNER JOIN 
-        rdstation_webhook_logs r 
+      INNER JOIN
+        rdstation_webhook_logs r
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
-      WHERE 
+      WHERE
         v."Cancelada" = false
-        AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-        AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
+        AND ${campaignExpr} IS NOT NULL
+        AND ${campaignExpr} != '(not set)'
         ${totalsDateFilter}
     `, totalsParams);
 
-    // Query de período anterior para comparação (mesmo intervalo antes)
-    let previousTotals = { total_vendas: 0, valor_total: 0, ticket_medio: 0 };
+    let previousPromise: Promise<any> = Promise.resolve({
+      rows: [{ total_vendas: 0, valor_total: 0, ticket_medio: 0 }]
+    });
+
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -131,76 +146,99 @@ app.get('/performance', async (c) => {
       const prevStart = new Date(prevEnd);
       prevStart.setDate(prevStart.getDate() - diffDays);
 
-      const prevResult = await query(`
+      const prevStartDate = prevStart.toISOString().split('T')[0];
+      const prevEndDate = prevEnd.toISOString().split('T')[0];
+      const previousDateFilterResult = buildVendaDateFilter(prevStartDate, prevEndDate, 1);
+
+      previousPromise = query(`
         SELECT
           COUNT(v."Codigo") AS total_vendas,
           COALESCE(SUM(v."ValorTotal"::numeric), 0) AS valor_total,
           COALESCE(AVG(v."ValorTotal"::numeric), 0) AS ticket_medio
-        FROM 
+        FROM
           "Venda" v
-        INNER JOIN 
-          rdstation_webhook_logs r 
+        INNER JOIN
+          rdstation_webhook_logs r
           ON LOWER(v."EntregaEmail") = LOWER(r.email)
-        WHERE 
+        WHERE
           v."Cancelada" = false
-          AND r.first_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-          AND r.first_conversion->'conversion_origin'->>'campaign' != '(not set)'
-          AND v."DataVenda"::date >= $1::date
-          AND v."DataVenda"::date <= $2::date
-      `, [prevStart.toISOString().split('T')[0], prevEnd.toISOString().split('T')[0]]);
-
-      if (prevResult.rows[0]) {
-        previousTotals = {
-          total_vendas: parseInt(prevResult.rows[0].total_vendas) || 0,
-          valor_total: parseFloat(prevResult.rows[0].valor_total) || 0,
-          ticket_medio: parseFloat(prevResult.rows[0].ticket_medio) || 0
-        };
-      }
+          AND ${campaignExpr} IS NOT NULL
+          AND ${campaignExpr} != '(not set)'
+          ${previousDateFilterResult.sql}
+      `, previousDateFilterResult.params);
     }
 
-    // Query de canais disponíveis (para filtro)
-    const channelsResult = await query(`
-      SELECT DISTINCT 
-        r.first_conversion->'conversion_origin'->>'source' AS origem
-      FROM 
+    const channelsPromise = query(`
+      SELECT DISTINCT
+        ${sourceExpr} AS origem
+      FROM
         "Venda" v
-      INNER JOIN 
-        rdstation_webhook_logs r 
+      INNER JOIN
+        rdstation_webhook_logs r
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
-      WHERE 
+      WHERE
         v."Cancelada" = false
-        AND r.first_conversion->'conversion_origin'->>'source' IS NOT NULL
+        AND ${campaignExpr} IS NOT NULL
+        AND ${campaignExpr} != '(not set)'
+        AND ${sourceExpr} IS NOT NULL
+        ${totalsDateFilter}
       ORDER BY 1
-    `);
+    `, totalsParams);
 
-    // Query de origens de pedido disponíveis (para filtro)
-    const origemPedidoResult = await query(`
-      SELECT DISTINCT 
+    const origemPedidoPromise = query(`
+      SELECT DISTINCT
         v."OrigemPedido" AS origem_pedido
-      FROM 
+      FROM
         "Venda" v
-      INNER JOIN 
-        rdstation_webhook_logs r 
+      INNER JOIN
+        rdstation_webhook_logs r
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
-      WHERE 
+      WHERE
         v."Cancelada" = false
+        AND ${campaignExpr} IS NOT NULL
+        AND ${campaignExpr} != '(not set)'
         AND v."OrigemPedido" IS NOT NULL
+        ${totalsDateFilter}
       ORDER BY 1
-    `);
+    `, totalsParams);
 
-    // Obter aportes agregados
-    const aportes = await AporteService.getAggregated({
+    const aportesPromise = AporteService.getAggregated({
       data_inicio: aporteStartDate,
       data_fim: aporteEndDate
     });
+    const totalAportesPromise = AporteService.getTotalByPeriod(aporteStartDate, aporteEndDate);
 
-    // Criar mapa de aportes para lookup rápido (apenas por campanha)
+    const [
+      campaignResult,
+      totalsResult,
+      previousResult,
+      channelsResult,
+      origemPedidoResult,
+      aportes,
+      totalAportes
+    ] = await Promise.all([
+      campaignPromise,
+      totalsPromise,
+      previousPromise,
+      channelsPromise,
+      origemPedidoPromise,
+      aportesPromise,
+      totalAportesPromise
+    ]);
+
+    const previousTotals = previousResult.rows[0]
+      ? {
+          total_vendas: parseInt(previousResult.rows[0].total_vendas) || 0,
+          valor_total: parseFloat(previousResult.rows[0].valor_total) || 0,
+          ticket_medio: parseFloat(previousResult.rows[0].ticket_medio) || 0
+        }
+      : { total_vendas: 0, valor_total: 0, ticket_medio: 0 };
+
     const aportesMap: Record<string, number> = {};
-    aportes.forEach(a => {
+    aportes.forEach((a: any) => {
       aportesMap[a.utm_campaign] = parseFloat(a.total_aporte);
     });
 
-    // Agrupar por canal para os gráficos
     const channelStats: Record<string, { total_vendas: number; valor_total: number; total_aporte: number; campanhas: Set<string> }> = {};
     for (const row of campaignResult.rows) {
       const channel = row.origem || '(direct)';
@@ -211,7 +249,6 @@ app.get('/performance', async (c) => {
       channelStats[channel].valor_total += parseFloat(row.valor_total_vendas);
       channelStats[channel].campanhas.add(row.utm_campaign);
 
-      // Somar aportes (agora apenas por campanha)
       if (aportesMap[row.utm_campaign]) {
         channelStats[channel].total_aporte += aportesMap[row.utm_campaign];
       }
@@ -227,8 +264,7 @@ app.get('/performance', async (c) => {
       total_campanhas: stats.campanhas.size
     })).sort((a, b) => b.valor_total - a.valor_total);
 
-    // Formatar campanhas com dados de eficiência e ROI
-    const campaigns = campaignResult.rows.map(row => {
+    const campaigns = campaignResult.rows.map((row: any) => {
       const totalVendas = parseInt(row.total_vendas);
       const valorTotal = parseFloat(row.valor_total_vendas);
       const primeiraVenda = row.primeira_venda;
@@ -241,7 +277,6 @@ app.get('/performance', async (c) => {
         );
       }
 
-      // Obter aporte para esta campanha (agora apenas por utm_campaign)
       const aporte = aportesMap[row.utm_campaign] || 0;
       const roas = aporte > 0 ? valorTotal / aporte : 0;
 
@@ -262,7 +297,6 @@ app.get('/performance', async (c) => {
     });
 
     const currentTotals = totalsResult.rows[0] || { total_vendas: 0, valor_total: 0, ticket_medio: 0 };
-    const totalAportes = await AporteService.getTotalByPeriod(aporteStartDate, aporteEndDate);
 
     return c.json({
       success: true,
@@ -276,8 +310,9 @@ app.get('/performance', async (c) => {
       },
       channels: channelSummary,
       campaigns,
-      available_channels: channelsResult.rows.map(r => r.origem).filter(Boolean),
-      available_origem_pedido: origemPedidoResult.rows.map(r => r.origem_pedido).filter(Boolean),
+      conversion_type: conversionType,
+      available_channels: channelsResult.rows.map((r: any) => r.origem).filter(Boolean),
+      available_origem_pedido: origemPedidoResult.rows.map((r: any) => r.origem_pedido).filter(Boolean),
       total_campaigns: campaigns.length
     });
   } catch (error) {
@@ -292,14 +327,15 @@ app.get('/performance', async (c) => {
 
 /**
  * GET /api/campaigns/orders
- * 
+ *
  * Retorna os pedidos/vendas vinculados a uma campanha específica.
- * 
+ *
  * Query Parameters:
  *   - utm_campaign: Nome da campanha
  *   - origem: Canal/origem da campanha
  *   - start_date: Data início (YYYY-MM-DD)
  *   - end_date: Data fim (YYYY-MM-DD)
+ *   - conversion_type: Tipo de conversão (first|last). Padrão: last
  */
 app.get('/orders', async (c) => {
   try {
@@ -308,6 +344,7 @@ app.get('/orders', async (c) => {
     const origemPedido = c.req.query('origem_pedido');
     const startDate = c.req.query('start_date');
     const endDate = c.req.query('end_date');
+    const { conversionType, conversionField } = resolveConversionField(c.req.query('conversion_type'));
 
     if (!utmCampaign || !origem) {
       return c.json({
@@ -316,31 +353,26 @@ app.get('/orders', async (c) => {
       }, 400);
     }
 
+    const campaignExpr = `r.${conversionField}->'conversion_origin'->>'campaign'`;
+    const sourceExpr = `r.${conversionField}->'conversion_origin'->>'source'`;
+
     let whereClause = `
-      WHERE r.first_conversion->'conversion_origin'->>'campaign' = $1
-      AND r.first_conversion->'conversion_origin'->>'source' = $2
+      WHERE ${campaignExpr} = $1
+      AND ${sourceExpr} = $2
       AND v."Cancelada" = false
     `;
     const params: any[] = [utmCampaign, origem];
     let paramIndex = 3;
 
-    // Adicionar filtro de origem_pedido se fornecido
     if (origemPedido) {
       whereClause += ` AND LOWER(v."OrigemPedido") = $${paramIndex}`;
       params.push(origemPedido.toLowerCase());
       paramIndex++;
     }
 
-    if (startDate) {
-      whereClause += ` AND v."DataVenda"::date >= $${paramIndex}::date`;
-      params.push(startDate);
-      paramIndex++;
-    }
-    if (endDate) {
-      whereClause += ` AND v."DataVenda"::date <= $${paramIndex}::date`;
-      params.push(endDate);
-      paramIndex++;
-    }
+    const ordersDateFilterResult = buildVendaDateFilter(startDate, endDate, paramIndex);
+    whereClause += ordersDateFilterResult.sql;
+    params.push(...ordersDateFilterResult.params);
 
     const ordersResult = await query(`
       SELECT
@@ -350,10 +382,10 @@ app.get('/orders', async (c) => {
         v."ValorTotal" AS valor_total,
         v."OrigemPedido" AS origem_pedido,
         v."Cancelada" AS cancelada
-      FROM 
+      FROM
         "Venda" v
-      INNER JOIN 
-        rdstation_webhook_logs r 
+      INNER JOIN
+        rdstation_webhook_logs r
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       ${whereClause}
       ORDER BY v."DataVenda" DESC
@@ -362,7 +394,8 @@ app.get('/orders', async (c) => {
 
     return c.json({
       success: true,
-      orders: ordersResult.rows.map(row => ({
+      conversion_type: conversionType,
+      orders: ordersResult.rows.map((row: any) => ({
         codigo: row.codigo,
         email: row.email,
         data_venda: row.data_venda,
