@@ -46,6 +46,30 @@ export interface RDStationWebhookPayload {
  * sempre que um gatilho configurado é acionado (conversão ou oportunidade).
  */
 export class RDStationWebhookService {
+  private static extractContactIdFromRawPayload(lead: RDStationWebhookLead): string | null {
+    const value = lead?.uuid;
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    return normalized || null;
+  }
+
+  private static async resolveContactId(lead: RDStationWebhookLead): Promise<string | null> {
+    const fromCurrentPayload = this.extractContactIdFromRawPayload(lead);
+    if (fromCurrentPayload) return fromCurrentPayload;
+
+    const email = (lead.email || '').trim();
+    const result = await query<{ contact_id: string | null }>(
+      `SELECT NULLIF(raw_payload->>'uuid', '') AS contact_id
+       FROM rdstation_webhook_logs
+       WHERE rdstation_lead_id = $1
+          OR ($2 <> '' AND email IS NOT NULL AND LOWER(email) = LOWER($2))
+       ORDER BY COALESCE(updated_at, received_at) DESC, id DESC
+       LIMIT 1`,
+      [lead.id, email]
+    );
+
+    return result.rows[0]?.contact_id || null;
+  }
 
   /**
    * Processa o payload completo recebido do webhook da RD Station.
@@ -185,12 +209,13 @@ export class RDStationWebhookService {
 
   /**
    * Salva ou atualiza o lead na tabela principal de leads.
-   * Usa o telefone (personal_phone ou mobile_phone) e email para identificar o lead.
+   * Usa email exato (case-insensitive) para identificar o lead.
    */
   private static async upsertLead(lead: RDStationWebhookLead): Promise<void> {
     try {
       const phone = lead.personal_phone || lead.mobile_phone || '';
       const email = lead.email || '';
+      const rdstationContactId = await this.resolveContactId(lead);
 
       if (!phone && !email) {
         console.warn(`⚠️ [RD Station Webhook] Lead ${lead.id} sem telefone e sem email, ignorando upsert na tabela leads`);
@@ -201,22 +226,10 @@ export class RDStationWebhookService {
       let existingLead = null;
       if (email) {
         const result = await query(
-          'SELECT * FROM leads WHERE email = $1 ORDER BY created_at DESC LIMIT 1',
+          'SELECT * FROM leads WHERE email IS NOT NULL AND LOWER(email) = LOWER($1) ORDER BY created_at DESC LIMIT 1',
           [email]
         );
         existingLead = result.rows[0] || null;
-      }
-
-      // Se não encontrou por email, tentar por telefone
-      if (!existingLead && phone) {
-        const cleanPhone = phone.replace(/\D/g, '');
-        if (cleanPhone) {
-          const result = await query(
-            'SELECT * FROM leads WHERE telefone LIKE $1 ORDER BY created_at DESC LIMIT 1',
-            [`%${cleanPhone.slice(-8)}%`]
-          );
-          existingLead = result.rows[0] || null;
-        }
       }
 
       if (existingLead) {
@@ -224,24 +237,26 @@ export class RDStationWebhookService {
         await query(
           `UPDATE leads SET
             email = COALESCE($1, email),
-            status = CASE WHEN $2 = 'true' THEN 'oportunidade' ELSE status END
-          WHERE id = $3`,
-          [email || null, lead.opportunity || 'false', existingLead.id]
+            status = CASE WHEN $2 = 'true' THEN 'oportunidade' ELSE status END,
+            rdstation_contact_id = COALESCE($3, rdstation_contact_id)
+          WHERE id = $4`,
+          [email || null, lead.opportunity || 'false', rdstationContactId, existingLead.id]
         );
         console.log(`🔄 [RD Station Webhook] Lead atualizado: ${existingLead.id}`);
       } else {
         // Criar novo lead
         await query(
           `INSERT INTO leads (
-            telefone, email, utm_source, utm_medium, utm_campaign, status
-          ) VALUES ($1, $2, $3, $4, $5, $6)`,
+            telefone, email, utm_source, utm_medium, utm_campaign, status, rdstation_contact_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             phone || 'sem-telefone',
             email || null,
             'rdstation',
             'webhook',
             lead.first_conversion?.content?.identifier || null,
-            lead.opportunity === 'true' ? 'oportunidade' : 'novo'
+            lead.opportunity === 'true' ? 'oportunidade' : 'novo',
+            rdstationContactId
           ]
         );
         console.log(`➕ [RD Station Webhook] Novo lead criado a partir do RD Station: ${email}`);

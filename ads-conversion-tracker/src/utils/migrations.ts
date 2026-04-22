@@ -33,6 +33,7 @@ export async function runAutoMigrations(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_ad_id ON meta_webhook_logs (ad_id)`);
 
     // Garantir que a coluna email existe na tabela leads
+
     await query(`
       DO $$
       BEGIN
@@ -49,6 +50,25 @@ export async function runAutoMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_leads_email_lower
       ON leads (LOWER(email))
       WHERE email IS NOT NULL
+    `);
+
+    // Garantir que a coluna rdstation_contact_id existe na tabela leads
+    await query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'leads' AND column_name = 'rdstation_contact_id'
+        ) THEN
+          ALTER TABLE leads ADD COLUMN rdstation_contact_id VARCHAR(100) DEFAULT NULL;
+        END IF;
+      END $$
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_leads_rdstation_contact_id
+      ON leads (rdstation_contact_id)
+      WHERE rdstation_contact_id IS NOT NULL
     `);
 
     // Garantir que a coluna events_payload existe na tabela conversoes
@@ -147,6 +167,26 @@ export async function runAutoMigrations(): Promise<void> {
       AND (last_conversion->'conversion_origin'->>'campaign') != '(not set)'
     `);
 
+    // Backfill idempotente do rdstation_contact_id em leads via email exato (case-insensitive)
+    await query(`
+      WITH latest_rd_per_email AS (
+        SELECT DISTINCT ON (LOWER(email))
+          LOWER(email) AS email_key,
+          NULLIF(raw_payload->>'UUID', '') AS contact_id
+        FROM rdstation_webhook_logs
+        WHERE email IS NOT NULL
+          AND TRIM(email) <> ''
+          AND raw_payload IS NOT NULL
+          AND NULLIF(raw_payload->>'UUID', '') IS NOT NULL
+        ORDER BY LOWER(email), COALESCE(updated_at, received_at) DESC, id DESC
+      )
+      UPDATE leads l
+      SET rdstation_contact_id = r.contact_id
+      FROM latest_rd_per_email r
+      WHERE l.email IS NOT NULL
+        AND LOWER(l.email) = r.email_key
+        AND (l.rdstation_contact_id IS DISTINCT FROM r.contact_id)
+    `);
     // Índices para acelerar joins/filtros de campanhas na tabela Venda (quando existir)
     await query(`
       DO $$
@@ -243,3 +283,4 @@ export async function runAutoMigrations(): Promise<void> {
     // As queries individuais que dependem dessas tabelas irão falhar com mensagens específicas
   }
 }
+

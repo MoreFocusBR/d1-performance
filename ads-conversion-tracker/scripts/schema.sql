@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS leads (
     telefone VARCHAR(255) NOT NULL,
     telefone_hash VARCHAR(64) NOT NULL UNIQUE,
     email VARCHAR(255) DEFAULT NULL,
+    rdstation_contact_id VARCHAR(100) DEFAULT NULL,
     utm_source VARCHAR(100),
     utm_medium VARCHAR(100),
     utm_campaign VARCHAR(255),
@@ -100,6 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
 CREATE INDEX IF NOT EXISTS idx_leads_status_created ON leads(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_leads_shopify_data ON leads USING GIN (shopify_data);
+CREATE INDEX IF NOT EXISTS idx_leads_rdstation_contact_id ON leads(rdstation_contact_id) WHERE rdstation_contact_id IS NOT NULL;
 
 -- ============================================
 -- Índices: conversoes

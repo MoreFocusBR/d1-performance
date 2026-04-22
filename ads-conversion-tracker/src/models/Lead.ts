@@ -4,6 +4,7 @@ export interface Lead {
   id: string;
   telefone: string;
   email?: string;
+  rdstation_contact_id?: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -22,6 +23,7 @@ export class LeadModel {
   static async create(data: {
     telefone: string;
     email?: string;
+    rdstation_contact_id?: string;
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
@@ -37,8 +39,8 @@ export class LeadModel {
     const result = await query<Lead>(
       `INSERT INTO leads (
         telefone, email, utm_source, utm_medium, utm_campaign, 
-        utm_content, utm_term, gclid, fbclid, ip_address, user_agent, shopify_data, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        utm_content, utm_term, gclid, fbclid, ip_address, user_agent, shopify_data, status, rdstation_contact_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *`,
       [
         data.telefone || null,
@@ -53,7 +55,8 @@ export class LeadModel {
         data.ip_address || null,
         data.user_agent || null,
         data.shopify_data ? JSON.stringify(data.shopify_data) : null,
-        'novo'
+        'novo',
+        data.rdstation_contact_id || null
       ]
     );
 
