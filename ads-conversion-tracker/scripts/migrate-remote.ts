@@ -54,12 +54,25 @@ async function runMigrations() {
         valor_venda DECIMAL(15,2) NOT NULL,
         canal VARCHAR(50) DEFAULT 'comercial',
         data_venda TIMESTAMP NOT NULL,
+        events_payload JSONB,
         google_ads_enviado BOOLEAN DEFAULT FALSE,
         meta_ads_enviado BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('✅ Tabela conversoes criada');
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'conversoes' AND column_name = 'events_payload'
+        ) THEN
+          ALTER TABLE conversoes ADD COLUMN events_payload JSONB;
+        END IF;
+      END $$;
+    `);
 
     // 3. Criar tabela meta_webhook_logs
     console.log('📝 Criando tabela meta_webhook_logs...');
@@ -129,6 +142,42 @@ async function runMigrations() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_meta_webhook_logs_ad_id ON meta_webhook_logs(ad_id)`);
     
     console.log('✅ Índices criados');
+
+    // 6. Criar/atualizar view com first/last conversion
+    console.log('Atualizando view vw_conversoes_confirmadas...');
+    await client.query(`
+      CREATE OR REPLACE VIEW vw_conversoes_confirmadas AS
+      SELECT
+        c.id AS conversao_id,
+        c.codigo_venda,
+        c.valor_venda,
+        c.data_venda,
+        c.canal,
+        c.created_at,
+        c.google_ads_enviado,
+        c.meta_ads_enviado,
+        l.id AS lead_id,
+        l.email AS lead_email,
+        l.status AS lead_status,
+        rd.last_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
+        rd.last_conversion->'conversion_origin'->>'source' AS origem,
+        rd.first_conversion->'conversion_origin'->>'campaign' AS first_utm_campaign,
+        rd.first_conversion->'conversion_origin'->>'source' AS first_origem,
+        rd.last_conversion->'conversion_origin'->>'campaign' AS last_utm_campaign,
+        rd.last_conversion->'conversion_origin'->>'source' AS last_origem
+      FROM conversoes c
+      JOIN leads l ON l.id = c.lead_id
+      LEFT JOIN LATERAL (
+        SELECT r.first_conversion, r.last_conversion
+        FROM rdstation_webhook_logs r
+        WHERE l.email IS NOT NULL
+          AND r.email IS NOT NULL
+          AND LOWER(r.email::text) = LOWER(l.email::text)
+        ORDER BY COALESCE(r.updated_at, r.received_at) DESC, r.id DESC
+        LIMIT 1
+      ) rd ON true
+    `);
+    console.log('View vw_conversoes_confirmadas atualizada');
 
     // Confirmar transação
     await client.query('COMMIT');

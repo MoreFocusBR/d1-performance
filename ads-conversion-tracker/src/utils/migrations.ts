@@ -45,6 +45,28 @@ export async function runAutoMigrations(): Promise<void> {
       END $$
     `);
 
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_leads_email_lower
+      ON leads (LOWER(email))
+      WHERE email IS NOT NULL
+    `);
+
+    // Garantir que a coluna events_payload existe na tabela conversoes
+    await query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_name = 'conversoes'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'conversoes' AND column_name = 'events_payload'
+        ) THEN
+          ALTER TABLE conversoes ADD COLUMN events_payload JSONB;
+        END IF;
+      END $$;
+    `);
+
     // Garantir que a coluna shopify_data existe na tabela leads
     await query(`
       DO $$
@@ -102,6 +124,11 @@ export async function runAutoMigrations(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_opportunity ON rdstation_webhook_logs (opportunity)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_email_lower ON rdstation_webhook_logs (LOWER(email))`);
     await query(`
+      CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_email_updated_desc
+      ON rdstation_webhook_logs (LOWER(email), COALESCE(updated_at, received_at) DESC, id DESC)
+      WHERE email IS NOT NULL
+    `);
+    await query(`
       CREATE INDEX IF NOT EXISTS idx_rdstation_wh_logs_first_campaign_source
       ON rdstation_webhook_logs (
         (first_conversion->'conversion_origin'->>'campaign'),
@@ -154,6 +181,41 @@ export async function runAutoMigrations(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_utm ON performance_aporte_campanha (utm_campaign)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_data ON performance_aporte_campanha (data_aporte DESC)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_aporte_campanha_combo ON performance_aporte_campanha (utm_campaign, data_aporte)`);
+
+    await query(`
+      CREATE OR REPLACE VIEW vw_conversoes_confirmadas AS
+      SELECT
+        c.id AS conversao_id,
+        c.codigo_venda,
+        c.valor_venda,
+        c.data_venda,
+        c.canal,
+        c.created_at,
+        c.google_ads_enviado,
+        c.meta_ads_enviado,
+        l.id AS lead_id,
+        l.email AS lead_email,
+        l.status AS lead_status,
+        -- Compat: mantém os nomes antigos apontando para last_conversion
+        rd.last_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
+        rd.last_conversion->'conversion_origin'->>'source' AS origem,
+        -- Campos explícitos para seleção dinâmica (first/last) na query consumidora
+        rd.first_conversion->'conversion_origin'->>'campaign' AS first_utm_campaign,
+        rd.first_conversion->'conversion_origin'->>'source' AS first_origem,
+        rd.last_conversion->'conversion_origin'->>'campaign' AS last_utm_campaign,
+        rd.last_conversion->'conversion_origin'->>'source' AS last_origem
+      FROM conversoes c
+      JOIN leads l ON l.id = c.lead_id
+      LEFT JOIN LATERAL (
+        SELECT r.first_conversion, r.last_conversion
+        FROM rdstation_webhook_logs r
+        WHERE l.email IS NOT NULL
+          AND r.email IS NOT NULL
+          AND LOWER(r.email::text) = LOWER(l.email::text)
+        ORDER BY COALESCE(r.updated_at, r.received_at) DESC, r.id DESC
+        LIMIT 1
+      ) rd ON true
+    `);
 
     // ============================================
     // Migrações adicionais: Alterações em tabelas existentes

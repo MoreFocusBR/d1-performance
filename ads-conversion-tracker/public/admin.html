@@ -970,6 +970,29 @@
             </div>
         </div>
 
+        <!-- CONVERSÕES CONFIRMADAS -->
+        <div class="card border-blue">
+            <div class="channel-header">
+                <div class="card-title" style="margin-bottom:0">Conversões Confirmadas</div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="text" class="date-input" id="confirmedSearch" placeholder="Buscar por pedido/email/campanha">
+                    <button class="quick-btn" onclick="syncConfirmedConversions()">Sincronizar Agora</button>
+                </div>
+            </div>
+            <div id="confirmedSyncStatus" style="font-size:12px;color:#8888aa;margin-bottom:10px">--</div>
+            <div id="confirmedConversionsContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top:12px">Carregando conversões...</p>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:10px">
+                <button class="quick-btn" id="confirmedPrevBtn" onclick="changeConfirmedPage(-1)">Anterior</button>
+                <span id="confirmedPageInfo" style="font-size:12px;color:#8888aa">Página 1/1</span>
+                <button class="quick-btn" id="confirmedNextBtn" onclick="changeConfirmedPage(1)">Próxima</button>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -1020,6 +1043,9 @@
         let chartOrigemPedidoVendas = null;
         let chartOrigemPedidoValor = null;
         let lastLoadedConversionType = 'last';
+        let confirmedPage = 1;
+        let confirmedTotalPages = 1;
+        const CONFIRMED_PAGE_SIZE = 20;
 
         const CHANNEL_COLORS = {
             'facebook': { bg: '#2266cc55', border: '#2266cc', text: '#6699ff' },
@@ -1073,6 +1099,12 @@
             document.getElementById('aporteStartDate').addEventListener('change', loadDashboard);
             document.getElementById('aporteEndDate').addEventListener('change', loadDashboard);
             document.getElementById('conversionType').addEventListener('change', loadDashboard);
+            document.getElementById('confirmedSearch').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    confirmedPage = 1;
+                    loadConfirmedConversions();
+                }
+            });
 
             setQuickFilter('thisMonth');
         }
@@ -1247,6 +1279,7 @@
 
                 renderFilteredData();
                 lastLoadedConversionType = conversionType;
+                await loadConfirmedConversions(1);
 
                 // Update timestamp
                 document.getElementById('lastUpdate').textContent = 'Atualizado em: ' + new Date().toLocaleTimeString('pt-BR');
@@ -1677,6 +1710,119 @@
             } catch (error) {
                 console.error('Erro ao carregar pedidos:', error);
                 detailsElement.innerHTML = '<p style="text-align:center;color:#ff4466;padding:20px">Erro ao carregar pedidos</p>';
+            }
+        }
+
+        async function loadConfirmedConversions(page = confirmedPage) {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const search = (document.getElementById('confirmedSearch').value || '').trim();
+            const container = document.getElementById('confirmedConversionsContainer');
+
+            try {
+                let url = `/api/conversions/confirmed?page=${page}&limit=${CONFIRMED_PAGE_SIZE}`;
+                if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+                if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+                if (!data.success) {
+                    container.innerHTML = '<p style="text-align:center;color:#ff4466;padding:20px">Erro ao carregar conversões confirmadas</p>';
+                    return;
+                }
+
+                confirmedPage = data.page || 1;
+                confirmedTotalPages = data.total_pages || 1;
+                renderConfirmedConversionsTable(data.rows || []);
+                updateConfirmedPagination();
+                document.getElementById('confirmedSyncStatus').textContent = `Total: ${data.total || 0} conversões confirmadas`;
+            } catch (error) {
+                console.error('Erro ao carregar conversões confirmadas:', error);
+                container.innerHTML = '<p style="text-align:center;color:#ff4466;padding:20px">Erro ao carregar conversões confirmadas</p>';
+            }
+        }
+
+        function renderConfirmedConversionsTable(rows) {
+            const container = document.getElementById('confirmedConversionsContainer');
+            if (!rows || rows.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:#666;padding:20px">Nenhuma conversão confirmada encontrada</p>';
+                return;
+            }
+
+            let html = `
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Email</th>
+                            <th>Campanha</th>
+                            <th>Origem</th>
+                            <th>Valor</th>
+                            <th>Data Venda</th>
+                            <th>Google</th>
+                            <th>Meta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            rows.forEach(row => {
+                html += `
+                    <tr>
+                        <td style="font-weight:600;color:#FF6B35">${row.codigo_venda || '--'}</td>
+                        <td>${row.lead_email || '--'}</td>
+                        <td>${row.utm_campaign || '--'}</td>
+                        <td>${row.origem || '--'}</td>
+                        <td class="order-value">${formatCurrency(row.valor_venda)}</td>
+                        <td class="order-date">${formatDate(row.data_venda)}</td>
+                        <td style="color:${row.google_ads_enviado ? '#44cc88' : '#8888aa'}">${row.google_ads_enviado ? 'Enviado' : 'Pendente'}</td>
+                        <td style="color:${row.meta_ads_enviado ? '#44cc88' : '#8888aa'}">${row.meta_ads_enviado ? 'Enviado' : 'Pendente'}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function updateConfirmedPagination() {
+            document.getElementById('confirmedPageInfo').textContent = `Página ${confirmedPage}/${confirmedTotalPages}`;
+            document.getElementById('confirmedPrevBtn').disabled = confirmedPage <= 1;
+            document.getElementById('confirmedNextBtn').disabled = confirmedPage >= confirmedTotalPages;
+        }
+
+        function changeConfirmedPage(direction) {
+            const nextPage = confirmedPage + direction;
+            if (nextPage < 1 || nextPage > confirmedTotalPages) return;
+            loadConfirmedConversions(nextPage);
+        }
+
+        async function syncConfirmedConversions() {
+            const statusEl = document.getElementById('confirmedSyncStatus');
+            statusEl.textContent = 'Sincronizando conversões...';
+
+            try {
+                const res = await fetch('/api/conversions/sync-confirmed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        batch_size: 50,
+                        max_batches: 1
+                    })
+                });
+
+                const data = await res.json();
+                if (!data.success) {
+                    statusEl.textContent = 'Erro ao sincronizar conversões';
+                    return;
+                }
+
+                statusEl.textContent = `Sync OK: ${data.inserted || 0} inseridas em ${data.executed_batches || 0} lotes (${data.duration_ms || 0}ms)`;
+                await loadConfirmedConversions(1);
+            } catch (error) {
+                console.error('Erro ao sincronizar conversões:', error);
+                statusEl.textContent = 'Erro ao sincronizar conversões';
             }
         }
 

@@ -195,12 +195,9 @@ app.get('/performance', async (c) => {
         ON LOWER(v."EntregaEmail") = LOWER(r.email)
       WHERE
         v."Cancelada" = false
-        AND ${campaignExpr} IS NOT NULL
-        AND ${campaignExpr} != '(not set)'
         AND v."OrigemPedido" IS NOT NULL
-        ${totalsDateFilter}
       ORDER BY 1
-    `, totalsParams);
+    `);
 
     const aportesPromise = AporteService.getAggregated({
       data_inicio: aporteStartDate,

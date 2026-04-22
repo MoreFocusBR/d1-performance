@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS conversoes (
     valor_venda DECIMAL(15,2) NOT NULL,
     canal VARCHAR(50) DEFAULT 'comercial',
     data_venda TIMESTAMP NOT NULL,
+    events_payload JSONB,
     google_ads_enviado BOOLEAN DEFAULT FALSE,
     meta_ads_enviado BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -122,7 +122,7 @@ const port = parseInt(process.env.PORT || '3001');
 
 async function startServer() {
   // Executar migrações automáticas antes de iniciar o servidor
-  // await runAutoMigrations();
+  await runAutoMigrations();
 
   console.log(`🚀 Server starting on port ${port}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
