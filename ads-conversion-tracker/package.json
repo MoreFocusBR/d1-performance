@@ -8,7 +8,8 @@
     "build": "bun build src/server.ts --outdir dist",
     "start": "bun dist/server.js",
     "db:migrate": "bun run scripts/migrate.ts",
-    "db:seed": "bun run scripts/seed.ts"
+    "db:seed": "bun run scripts/seed.ts",
+    "backfill:conversion-events": "bun run scripts/backfill-conversion-events.ts"
   },
   "dependencies": {
     "hono": "^4.0.0",

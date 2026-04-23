@@ -64,6 +64,28 @@ app.post('/', async (c) => {
   }
 });
 
+// GET /api/conversions/:id/events - Get events payload for a conversion
+app.get('/:id/events', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const result = await ConversionService.getConversionEvents(id);
+
+    if (!result.found) {
+      return c.json({ success: false, error: 'Conversion not found' }, 404);
+    }
+
+    return c.json({
+      success: true,
+      conversion_id: result.conversion_id,
+      events_payload: result.events_payload || [],
+      events_count: result.events_count || 0
+    });
+  } catch (error) {
+    console.error('Error in GET /conversions/:id/events:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // GET /api/conversions/:id - Get conversion details
 app.get('/:id', async (c) => {
   try {

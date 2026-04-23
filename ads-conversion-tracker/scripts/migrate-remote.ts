@@ -173,6 +173,7 @@ async function runMigrations() {
         WHERE l.email IS NOT NULL
           AND r.email IS NOT NULL
           AND LOWER(r.email::text) = LOWER(l.email::text)
+          AND COALESCE(r.updated_at, r.received_at)::date <= c.data_venda::date
         ORDER BY COALESCE(r.updated_at, r.received_at) DESC, r.id DESC
         LIMIT 1
       ) rd ON true

@@ -596,6 +596,33 @@
             font-weight: 600;
         }
 
+        .event-summary-line {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .event-summary-line span {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            max-width: 100%;
+        }
+
+        .event-payload-pre {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            background: #0b0d1b;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #cfd3f8;
+            max-width: 100%;
+        }
+
         .orders-loading {
             text-align: center;
             padding: 40px;
@@ -829,8 +856,8 @@
                     <span class="date-label">até</span>
                     <input type="date" class="date-input" id="endDate">
                     <select class="date-input" id="conversionType" title="Tipo de conversão">
-                        <option value="last" selected>Last conversion</option>
-                        <option value="first">First conversion</option>
+                        <option value="last" selected>Última conversão</option>
+                        <option value="first">Primeira conversão</option>
                     </select>
                 </div>
                 <div class="quick-filters">
@@ -969,30 +996,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- CONVERSÕES CONFIRMADAS -->
-        <div class="card border-blue">
-            <div class="channel-header">
-                <div class="card-title" style="margin-bottom:0">Conversões Confirmadas</div>
-                <div style="display:flex;gap:8px;align-items:center">
-                    <input type="text" class="date-input" id="confirmedSearch" placeholder="Buscar por pedido/email/campanha">
-                    <button class="quick-btn" onclick="syncConfirmedConversions()">Sincronizar Agora</button>
-                </div>
-            </div>
-            <div id="confirmedSyncStatus" style="font-size:12px;color:#8888aa;margin-bottom:10px">--</div>
-            <div id="confirmedConversionsContainer">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top:12px">Carregando conversões...</p>
-                </div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:10px">
-                <button class="quick-btn" id="confirmedPrevBtn" onclick="changeConfirmedPage(-1)">Anterior</button>
-                <span id="confirmedPageInfo" style="font-size:12px;color:#8888aa">Página 1/1</span>
-                <button class="quick-btn" id="confirmedNextBtn" onclick="changeConfirmedPage(1)">Próxima</button>
-            </div>
-        </div>
-
     </div>
 
     <script>
@@ -1043,9 +1046,11 @@
         let chartOrigemPedidoVendas = null;
         let chartOrigemPedidoValor = null;
         let lastLoadedConversionType = 'last';
-        let confirmedPage = 1;
-        let confirmedTotalPages = 1;
-        const CONFIRMED_PAGE_SIZE = 20;
+        const SYNC_TRIGGER_MS = 60000;
+        let isSyncInProgress = false;
+        let syncTriggerInterval = null;
+        const conversionEventsCache = new Map();
+        const loadedCampaignDetails = new Set();
 
         const CHANNEL_COLORS = {
             'facebook': { bg: '#2266cc55', border: '#2266cc', text: '#6699ff' },
@@ -1099,14 +1104,11 @@
             document.getElementById('aporteStartDate').addEventListener('change', loadDashboard);
             document.getElementById('aporteEndDate').addEventListener('change', loadDashboard);
             document.getElementById('conversionType').addEventListener('change', loadDashboard);
-            document.getElementById('confirmedSearch').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    confirmedPage = 1;
-                    loadConfirmedConversions();
-                }
-            });
+            document.getElementById('campaignList').addEventListener('click', handleCampaignListClick);
+            document.addEventListener('click', handleOrderEventsClick);
 
             setQuickFilter('thisMonth');
+            startAutoSyncTrigger();
         }
 
         function formatDateInput(d) {
@@ -1120,6 +1122,27 @@
         function formatDate(d) {
             if (!d) return '--';
             return new Date(d).toLocaleDateString('pt-BR');
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function makeCampaignKey(c, idx) {
+            const raw = `${idx}_${c.utm_campaign || ''}_${c.origem || ''}_${c.origem_pedido || ''}`;
+            return `cmp_${raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`;
+        }
+
+        function formatEventDate(value) {
+            if (!value) return '--';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return String(value);
+            return d.toLocaleString('pt-BR');
         }
 
         // ===== QUICK FILTERS =====
@@ -1279,7 +1302,6 @@
 
                 renderFilteredData();
                 lastLoadedConversionType = conversionType;
-                await loadConfirmedConversions(1);
 
                 // Update timestamp
                 document.getElementById('lastUpdate').textContent = 'Atualizado em: ' + new Date().toLocaleTimeString('pt-BR');
@@ -1572,6 +1594,7 @@
             const container = document.getElementById('campaignList');
             const title = document.getElementById('campaignListTitle');
             title.textContent = `Performance das Campanhas (${campaigns.length})`;
+            loadedCampaignDetails.clear();
 
             if (campaigns.length === 0) {
                 container.innerHTML = '<p style="text-align:center;color:#666;padding:40px">Nenhuma campanha encontrada para os filtros selecionados</p>';
@@ -1588,17 +1611,20 @@
                 const roiColor = c.roas >= 1 ? '#44cc88' : '#ff4466';
 
                 const origemPedidoColor = getOrigemPedidoColor(c.origem_pedido);
-                const campaignKey = `${c.utm_campaign}_${c.origem}`;
+                const campaignKey = makeCampaignKey(c, idx);
+                const safeCampaignName = escapeHtml(c.utm_campaign || '--');
+                const safeOrigem = escapeHtml(c.origem || '--');
+                const safeOrigemPedido = escapeHtml(c.origem_pedido || '');
             container.innerHTML += `
             <div class="campaign-item" style="border-left-color:${color.border}" data-campaign-key="${campaignKey}">
                 <div>
                     <div class="ci-label">Campanha</div>
-                    <div class="campaign-name">${c.utm_campaign}</div>
-                    <span class="source-badge" style="background:${color.bg};color:${color.text}">${c.origem}</span>
+                    <div class="campaign-name">${safeCampaignName}</div>
+                    <span class="source-badge" style="background:${color.bg};color:${color.text}">${safeOrigem}</span>
                 </div>
                 <div>
                     <div class="ci-label">Canal da Venda</div>
-                    <span class="source-badge" style="background:${origemPedidoColor.bg};color:${origemPedidoColor.text}">${c.origem_pedido}</span>
+                    <span class="source-badge" style="background:${origemPedidoColor.bg};color:${origemPedidoColor.text}">${safeOrigemPedido || '--'}</span>
                 </div>
                 <div>
                     <div class="ci-label">Total de Vendas</div>
@@ -1624,7 +1650,12 @@
                     <div class="ci-value green">${formatCurrency(ticket)}</div>
                     <div class="ci-sub">~ por pedido</div>
                 </div>
-                <button class="campaign-expand-btn" onclick="toggleCampaignDetails('${campaignKey}', '${c.utm_campaign}', '${c.origem}', '${c.origem_pedido}')">▼</button>
+                <button class="campaign-expand-btn"
+                    data-action="toggle-campaign"
+                    data-campaign-key="${campaignKey}"
+                    data-campaign-name="${safeCampaignName}"
+                    data-origem="${safeOrigem}"
+                    data-origem-pedido="${safeOrigemPedido}">&#9660;</button>
             </div>
             <div class="campaign-details" id="details-${campaignKey}">
                 <div class="orders-loading">
@@ -1636,9 +1667,21 @@
             });
         }
 
-        function toggleCampaignDetails(campaignKey, campaignName, origem, origemPedido) {
+        function handleCampaignListClick(e) {
+            const btn = e.target.closest('[data-action="toggle-campaign"]');
+            if (!btn) return;
+
+            const campaignKey = btn.getAttribute('data-campaign-key');
+            const campaignName = btn.getAttribute('data-campaign-name') || '';
+            const origem = btn.getAttribute('data-origem') || '';
+            const origemPedido = btn.getAttribute('data-origem-pedido') || '';
+            toggleCampaignDetails(campaignKey, campaignName, origem, origemPedido, btn);
+        }
+
+        function toggleCampaignDetails(campaignKey, campaignName, origem, origemPedido, externalButton) {
             const detailsElement = document.getElementById(`details-${campaignKey}`);
-            const btnElement = document.querySelector(`[data-campaign-key="${campaignKey}"] .campaign-expand-btn`);
+            const btnElement = externalButton || document.querySelector(`[data-campaign-key="${campaignKey}"] .campaign-expand-btn`);
+            if (!detailsElement || !btnElement) return;
             
             if (detailsElement.classList.contains('show')) {
                 detailsElement.classList.remove('show');
@@ -1646,7 +1689,10 @@
             } else {
                 detailsElement.classList.add('show');
                 btnElement.classList.add('expanded');
-                loadCampaignOrders(campaignKey, campaignName, origem, origemPedido);
+                if (!loadedCampaignDetails.has(campaignKey)) {
+                    loadCampaignOrders(campaignKey, campaignName, origem, origemPedido);
+                    loadedCampaignDetails.add(campaignKey);
+                }
             }
         }
 
@@ -1680,15 +1726,18 @@
                                 <th>Data</th>
                                 <th>Valor</th>
                                 <th>Canal da Venda</th>
+                                <th>Eventos</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                 `;
                 
-                data.orders.forEach(order => {
+                data.orders.forEach((order, idx) => {
                     const statusColor = order.cancelada ? '#ff4466' : '#44cc88';
                     const statusText = order.cancelada ? 'Cancelado' : 'Confirmado';
+                    const rowKey = `${campaignKey}_${idx}`;
+                    const canShowEvents = !!order.conversao_id;
                     html += `
                         <tr>
                             <td style="font-weight:600;color:#FF6B35">${order.codigo || '--'}</td>
@@ -1696,7 +1745,17 @@
                             <td class="order-date">${formatDate(order.data_venda)}</td>
                             <td class="order-value">${formatCurrency(order.valor_total)}</td>
                             <td>${order.origem_pedido || 'Nao informado'}</td>
+                            <td>
+                                ${canShowEvents
+                                    ? `<button class="quick-btn" data-action="toggle-order-events" data-conversion-id="${order.conversao_id}" data-row-key="${rowKey}" data-events-count="${order.events_count || 0}" style="padding:4px 10px;font-size:11px">Ver eventos (${order.events_count || 0})</button>`
+                                    : '<span style="color:#777">--</span>'}
+                            </td>
                             <td><span style="color:${statusColor};font-weight:600">${statusText}</span></td>
+                        </tr>
+                        <tr class="order-events-row" data-row-key="${rowKey}" style="display:none">
+                            <td colspan="7" style="background:#0f1020;padding:14px 16px">
+                                <div style="font-size:12px;color:#9aa0c5">Clique em "Ver eventos" para carregar.</div>
+                            </td>
                         </tr>
                     `;
                 });
@@ -1713,94 +1772,104 @@
             }
         }
 
-        async function loadConfirmedConversions(page = confirmedPage) {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const search = (document.getElementById('confirmedSearch').value || '').trim();
-            const container = document.getElementById('confirmedConversionsContainer');
-
-            try {
-                let url = `/api/conversions/confirmed?page=${page}&limit=${CONFIRMED_PAGE_SIZE}`;
-                if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
-                if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
-                if (search) url += `&search=${encodeURIComponent(search)}`;
-
-                const res = await fetch(url);
-                const data = await res.json();
-                if (!data.success) {
-                    container.innerHTML = '<p style="text-align:center;color:#ff4466;padding:20px">Erro ao carregar conversões confirmadas</p>';
-                    return;
-                }
-
-                confirmedPage = data.page || 1;
-                confirmedTotalPages = data.total_pages || 1;
-                renderConfirmedConversionsTable(data.rows || []);
-                updateConfirmedPagination();
-                document.getElementById('confirmedSyncStatus').textContent = `Total: ${data.total || 0} conversões confirmadas`;
-            } catch (error) {
-                console.error('Erro ao carregar conversões confirmadas:', error);
-                container.innerHTML = '<p style="text-align:center;color:#ff4466;padding:20px">Erro ao carregar conversões confirmadas</p>';
+        function renderOrderEvents(events) {
+            if (!Array.isArray(events) || events.length === 0) {
+                return '<div style="font-size:12px;color:#9aa0c5">Sem eventos para esta conversão.</div>';
             }
+
+            return events.map((ev) => {
+                const type = escapeHtml(ev?.event_type || ev?.event || ev?.type || '--');
+                const when = formatEventDate(ev?.event_timestamp || ev?.date);
+                const payload = escapeHtml(JSON.stringify(ev, null, 2));
+
+                return `
+                    <div style="border:1px solid #2b2f4d;border-radius:8px;padding:10px;margin-bottom:8px">
+                        <div class="event-summary-line">
+                            <span><strong>Tipo:</strong> ${type}</span>
+                            <span><strong>Data:</strong> ${when}</span>
+                        </div>
+                        <details>
+                            <summary style="cursor:pointer;font-size:12px;color:#9aa0c5">Ver payload do evento</summary>
+                            <pre class="event-payload-pre">${payload}</pre>
+                        </details>
+                    </div>
+                `;
+            }).join('');
         }
 
-        function renderConfirmedConversionsTable(rows) {
-            const container = document.getElementById('confirmedConversionsContainer');
-            if (!rows || rows.length === 0) {
-                container.innerHTML = '<p style="text-align:center;color:#666;padding:20px">Nenhuma conversão confirmada encontrada</p>';
+        async function handleOrderEventsClick(e) {
+            const btn = e.target.closest('[data-action="toggle-order-events"]');
+            if (!btn) return;
+
+            const conversionId = btn.getAttribute('data-conversion-id');
+            const rowKey = btn.getAttribute('data-row-key');
+            if (!conversionId || !rowKey) return;
+
+            const table = btn.closest('table');
+            if (!table) return;
+
+            const detailsRow = table.querySelector(`.order-events-row[data-row-key="${rowKey}"]`);
+            if (!detailsRow) return;
+            const contentCell = detailsRow.querySelector('td');
+            if (!contentCell) return;
+
+            if (detailsRow.style.display === 'none') {
+                detailsRow.style.display = '';
+                btn.textContent = 'Ocultar eventos';
+            } else {
+                detailsRow.style.display = 'none';
+                const eventsCount = btn.getAttribute('data-events-count') || '0';
+                btn.textContent = `Ver eventos (${eventsCount})`;
                 return;
             }
 
-            let html = `
-                <table class="orders-table">
-                    <thead>
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Email</th>
-                            <th>Campanha</th>
-                            <th>Origem</th>
-                            <th>Valor</th>
-                            <th>Data Venda</th>
-                            <th>Google</th>
-                            <th>Meta</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+            const cachedEvents = conversionEventsCache.get(conversionId);
+            if (cachedEvents) {
+                contentCell.innerHTML = renderOrderEvents(cachedEvents);
+                return;
+            }
 
-            rows.forEach(row => {
-                html += `
-                    <tr>
-                        <td style="font-weight:600;color:#FF6B35">${row.codigo_venda || '--'}</td>
-                        <td>${row.lead_email || '--'}</td>
-                        <td>${row.utm_campaign || '--'}</td>
-                        <td>${row.origem || '--'}</td>
-                        <td class="order-value">${formatCurrency(row.valor_venda)}</td>
-                        <td class="order-date">${formatDate(row.data_venda)}</td>
-                        <td style="color:${row.google_ads_enviado ? '#44cc88' : '#8888aa'}">${row.google_ads_enviado ? 'Enviado' : 'Pendente'}</td>
-                        <td style="color:${row.meta_ads_enviado ? '#44cc88' : '#8888aa'}">${row.meta_ads_enviado ? 'Enviado' : 'Pendente'}</td>
-                    </tr>
-                `;
-            });
+            contentCell.innerHTML = '<div style="font-size:12px;color:#9aa0c5">Carregando eventos...</div>';
+            try {
+                const res = await fetch(`/api/conversions/${encodeURIComponent(conversionId)}/events`);
+                const data = await res.json();
+                if (!data.success) {
+                    contentCell.innerHTML = '<div style="font-size:12px;color:#ff6b6b">Erro ao carregar eventos.</div>';
+                    return;
+                }
 
-            html += '</tbody></table>';
-            container.innerHTML = html;
+                const events = Array.isArray(data.events_payload) ? data.events_payload : [];
+                conversionEventsCache.set(conversionId, events);
+                btn.setAttribute('data-events-count', String(events.length));
+                contentCell.innerHTML = renderOrderEvents(events);
+            } catch (err) {
+                console.error('Erro ao carregar eventos da conversão:', err);
+                contentCell.innerHTML = '<div style="font-size:12px;color:#ff6b6b">Erro ao carregar eventos.</div>';
+            }
         }
 
-        function updateConfirmedPagination() {
-            document.getElementById('confirmedPageInfo').textContent = `Página ${confirmedPage}/${confirmedTotalPages}`;
-            document.getElementById('confirmedPrevBtn').disabled = confirmedPage <= 1;
-            document.getElementById('confirmedNextBtn').disabled = confirmedPage >= confirmedTotalPages;
+        function startAutoSyncTrigger() {
+            if (syncTriggerInterval) {
+                clearInterval(syncTriggerInterval);
+            }
+
+            if (sessionStorage.getItem(AUTH_KEY) === 'true') {
+                syncConfirmedConversions({ silent: true });
+            }
+
+            syncTriggerInterval = setInterval(() => {
+                if (sessionStorage.getItem(AUTH_KEY) === 'true') {
+                    syncConfirmedConversions({ silent: true });
+                }
+            }, SYNC_TRIGGER_MS);
         }
 
-        function changeConfirmedPage(direction) {
-            const nextPage = confirmedPage + direction;
-            if (nextPage < 1 || nextPage > confirmedTotalPages) return;
-            loadConfirmedConversions(nextPage);
-        }
+        async function syncConfirmedConversions(options = {}) {
+            if (isSyncInProgress) return;
+            isSyncInProgress = true;
 
-        async function syncConfirmedConversions() {
-            const statusEl = document.getElementById('confirmedSyncStatus');
-            statusEl.textContent = 'Sincronizando conversões...';
+            const silent = options.silent === true;
+            if (!silent) console.log('[Sync Confirmed] Iniciando sincronização...');
 
             try {
                 const res = await fetch('/api/conversions/sync-confirmed', {
@@ -1814,15 +1883,16 @@
 
                 const data = await res.json();
                 if (!data.success) {
-                    statusEl.textContent = 'Erro ao sincronizar conversões';
+                    console.error('[Sync Confirmed] Erro de resposta', data);
                     return;
                 }
 
-                statusEl.textContent = `Sync OK: ${data.inserted || 0} inseridas em ${data.executed_batches || 0} lotes (${data.duration_ms || 0}ms)`;
-                await loadConfirmedConversions(1);
+                console.log('[Sync Confirmed] OK', data);
+                await loadDashboard();
             } catch (error) {
                 console.error('Erro ao sincronizar conversões:', error);
-                statusEl.textContent = 'Erro ao sincronizar conversões';
+            } finally {
+                isSyncInProgress = false;
             }
         }
 

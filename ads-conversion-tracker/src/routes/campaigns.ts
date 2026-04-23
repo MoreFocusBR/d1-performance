@@ -7,7 +7,9 @@ const app = new Hono();
 function resolveConversionField(conversionTypeRaw?: string) {
   const conversionType = conversionTypeRaw === 'first' ? 'first' : 'last';
   const conversionField = conversionType === 'first' ? 'first_conversion' : 'last_conversion';
-  return { conversionType, conversionField };
+  const viewCampaignField = conversionType === 'first' ? 'first_utm_campaign' : 'last_utm_campaign';
+  const viewSourceField = conversionType === 'first' ? 'first_origem' : 'last_origem';
+  return { conversionType, conversionField, viewCampaignField, viewSourceField };
 }
 
 function buildVendaDateFilter(
@@ -57,12 +59,12 @@ app.get('/performance', async (c) => {
     const aporteStartDate = c.req.query('aporte_start_date');
     const aporteEndDate = c.req.query('aporte_end_date');
     const origemPedidoFilter = c.req.query('origem_pedido');
-    const { conversionType, conversionField } = resolveConversionField(c.req.query('conversion_type'));
+    const { conversionType, viewCampaignField, viewSourceField } = resolveConversionField(c.req.query('conversion_type'));
 
-    const campaignExpr = `r.${conversionField}->'conversion_origin'->>'campaign'`;
-    const sourceExpr = `r.${conversionField}->'conversion_origin'->>'source'`;
+    const campaignExpr = `v.${viewCampaignField}`;
+    const sourceExpr = `v.${viewSourceField}`;
 
-    const dateFilterResult = buildVendaDateFilter(startDate, endDate, 1);
+    const dateFilterResult = buildVendaDateFilter(startDate, endDate, 1, 'v.data_venda');
     const dateFilter = dateFilterResult.sql;
     const params: any[] = [...dateFilterResult.params];
     let paramIndex = dateFilterResult.nextParamIndex;
@@ -80,7 +82,7 @@ app.get('/performance', async (c) => {
     if (origemPedidoFilter) {
       const origensPedido = origemPedidoFilter.split(',').map(o => o.trim());
       const placeholders = origensPedido.map((_, i) => `$${paramIndex + i}`).join(', ');
-      origemPedidoFilterSQL = ` AND LOWER(v."OrigemPedido") IN (${placeholders})`;
+      origemPedidoFilterSQL = ` AND LOWER(v.canal) IN (${placeholders})`;
       params.push(...origensPedido.map(o => o.toLowerCase()));
       paramIndex += origensPedido.length;
     }
@@ -89,19 +91,17 @@ app.get('/performance', async (c) => {
       SELECT
         ${campaignExpr} AS utm_campaign,
         ${sourceExpr} AS origem,
-        v."OrigemPedido" AS origem_pedido,
-        COUNT(v."Codigo") AS total_vendas,
-        SUM(v."ValorTotal"::numeric) AS valor_total_vendas,
-        MIN(v."DataVenda") AS primeira_venda,
-        MAX(v."DataVenda") AS ultima_venda
+        v.canal AS origem_pedido,
+        COUNT(v.conversao_id) AS total_vendas,
+        SUM(v.valor_venda::numeric) AS valor_total_vendas,
+        MIN(v.data_venda) AS primeira_venda,
+        MAX(v.data_venda) AS ultima_venda
       FROM
-        "Venda" v
-      INNER JOIN
-        rdstation_webhook_logs r
-        ON LOWER(v."EntregaEmail") = LOWER(r.email)
+        vw_conversoes_confirmadas v
       WHERE
-        v."Cancelada" = false
+        1=1
         AND ${campaignExpr} IS NOT NULL
+        AND TRIM(${campaignExpr}) <> ''
         AND ${campaignExpr} != '(not set)'
         ${dateFilter}
         ${origemFilterSQL}
@@ -112,23 +112,21 @@ app.get('/performance', async (c) => {
         valor_total_vendas DESC
     `, params);
 
-    const totalsDateFilterResult = buildVendaDateFilter(startDate, endDate, 1);
+    const totalsDateFilterResult = buildVendaDateFilter(startDate, endDate, 1, 'v.data_venda');
     const totalsDateFilter = totalsDateFilterResult.sql;
     const totalsParams = totalsDateFilterResult.params;
 
     const totalsPromise = query(`
       SELECT
-        COUNT(v."Codigo") AS total_vendas,
-        COALESCE(SUM(v."ValorTotal"::numeric), 0) AS valor_total,
-        COALESCE(AVG(v."ValorTotal"::numeric), 0) AS ticket_medio
+        COUNT(v.conversao_id) AS total_vendas,
+        COALESCE(SUM(v.valor_venda::numeric), 0) AS valor_total,
+        COALESCE(AVG(v.valor_venda::numeric), 0) AS ticket_medio
       FROM
-        "Venda" v
-      INNER JOIN
-        rdstation_webhook_logs r
-        ON LOWER(v."EntregaEmail") = LOWER(r.email)
+        vw_conversoes_confirmadas v
       WHERE
-        v."Cancelada" = false
+        1=1
         AND ${campaignExpr} IS NOT NULL
+        AND TRIM(${campaignExpr}) <> ''
         AND ${campaignExpr} != '(not set)'
         ${totalsDateFilter}
     `, totalsParams);
@@ -148,21 +146,19 @@ app.get('/performance', async (c) => {
 
       const prevStartDate = prevStart.toISOString().split('T')[0];
       const prevEndDate = prevEnd.toISOString().split('T')[0];
-      const previousDateFilterResult = buildVendaDateFilter(prevStartDate, prevEndDate, 1);
+      const previousDateFilterResult = buildVendaDateFilter(prevStartDate, prevEndDate, 1, 'v.data_venda');
 
       previousPromise = query(`
         SELECT
-          COUNT(v."Codigo") AS total_vendas,
-          COALESCE(SUM(v."ValorTotal"::numeric), 0) AS valor_total,
-          COALESCE(AVG(v."ValorTotal"::numeric), 0) AS ticket_medio
+          COUNT(v.conversao_id) AS total_vendas,
+          COALESCE(SUM(v.valor_venda::numeric), 0) AS valor_total,
+          COALESCE(AVG(v.valor_venda::numeric), 0) AS ticket_medio
         FROM
-          "Venda" v
-        INNER JOIN
-          rdstation_webhook_logs r
-          ON LOWER(v."EntregaEmail") = LOWER(r.email)
+          vw_conversoes_confirmadas v
         WHERE
-          v."Cancelada" = false
+          1=1
           AND ${campaignExpr} IS NOT NULL
+          AND TRIM(${campaignExpr}) <> ''
           AND ${campaignExpr} != '(not set)'
           ${previousDateFilterResult.sql}
       `, previousDateFilterResult.params);
@@ -172,30 +168,26 @@ app.get('/performance', async (c) => {
       SELECT DISTINCT
         ${sourceExpr} AS origem
       FROM
-        "Venda" v
-      INNER JOIN
-        rdstation_webhook_logs r
-        ON LOWER(v."EntregaEmail") = LOWER(r.email)
+        vw_conversoes_confirmadas v
       WHERE
-        v."Cancelada" = false
+        1=1
         AND ${campaignExpr} IS NOT NULL
+        AND TRIM(${campaignExpr}) <> ''
         AND ${campaignExpr} != '(not set)'
         AND ${sourceExpr} IS NOT NULL
+        AND TRIM(${sourceExpr}) <> ''
         ${totalsDateFilter}
       ORDER BY 1
     `, totalsParams);
 
     const origemPedidoPromise = query(`
       SELECT DISTINCT
-        v."OrigemPedido" AS origem_pedido
+        v.canal AS origem_pedido
       FROM
-        "Venda" v
-      INNER JOIN
-        rdstation_webhook_logs r
-        ON LOWER(v."EntregaEmail") = LOWER(r.email)
+        vw_conversoes_confirmadas v
       WHERE
-        v."Cancelada" = false
-        AND v."OrigemPedido" IS NOT NULL
+        v.canal IS NOT NULL
+        AND TRIM(v.canal) <> ''
       ORDER BY 1
     `);
 
@@ -341,7 +333,7 @@ app.get('/orders', async (c) => {
     const origemPedido = c.req.query('origem_pedido');
     const startDate = c.req.query('start_date');
     const endDate = c.req.query('end_date');
-    const { conversionType, conversionField } = resolveConversionField(c.req.query('conversion_type'));
+    const { conversionType, viewCampaignField, viewSourceField } = resolveConversionField(c.req.query('conversion_type'));
 
     if (!utmCampaign || !origem) {
       return c.json({
@@ -350,42 +342,43 @@ app.get('/orders', async (c) => {
       }, 400);
     }
 
-    const campaignExpr = `r.${conversionField}->'conversion_origin'->>'campaign'`;
-    const sourceExpr = `r.${conversionField}->'conversion_origin'->>'source'`;
+    const campaignExpr = `v.${viewCampaignField}`;
+    const sourceExpr = `v.${viewSourceField}`;
 
     let whereClause = `
       WHERE ${campaignExpr} = $1
       AND ${sourceExpr} = $2
-      AND v."Cancelada" = false
     `;
     const params: any[] = [utmCampaign, origem];
     let paramIndex = 3;
 
     if (origemPedido) {
-      whereClause += ` AND LOWER(v."OrigemPedido") = $${paramIndex}`;
+      whereClause += ` AND LOWER(v.canal) = $${paramIndex}`;
       params.push(origemPedido.toLowerCase());
       paramIndex++;
     }
 
-    const ordersDateFilterResult = buildVendaDateFilter(startDate, endDate, paramIndex);
+    const ordersDateFilterResult = buildVendaDateFilter(startDate, endDate, paramIndex, 'v.data_venda');
     whereClause += ordersDateFilterResult.sql;
     params.push(...ordersDateFilterResult.params);
 
     const ordersResult = await query(`
       SELECT
-        v."Codigo" AS codigo,
-        v."EntregaEmail" AS email,
-        v."DataVenda" AS data_venda,
-        v."ValorTotal" AS valor_total,
-        v."OrigemPedido" AS origem_pedido,
-        v."Cancelada" AS cancelada
+        v.codigo_venda AS codigo,
+        v.lead_email AS email,
+        v.data_venda AS data_venda,
+        v.valor_venda AS valor_total,
+        v.canal AS origem_pedido,
+        false AS cancelada,
+        v.conversao_id AS conversao_id,
+        jsonb_array_length(COALESCE(c.events_payload, '[]'::jsonb)) AS events_count
       FROM
-        "Venda" v
+        vw_conversoes_confirmadas v
       INNER JOIN
-        rdstation_webhook_logs r
-        ON LOWER(v."EntregaEmail") = LOWER(r.email)
+        conversoes c
+        ON c.id = v.conversao_id
       ${whereClause}
-      ORDER BY v."DataVenda" DESC
+      ORDER BY v.data_venda DESC
       LIMIT 100
     `, params);
 
@@ -398,7 +391,9 @@ app.get('/orders', async (c) => {
         data_venda: row.data_venda,
         valor_total: parseFloat(row.valor_total) || 0,
         origem_pedido: row.origem_pedido || 'Não informado',
-        cancelada: row.cancelada
+        cancelada: row.cancelada,
+        conversao_id: row.conversao_id || null,
+        events_count: parseInt(row.events_count) || 0
       }))
     });
   } catch (error) {
@@ -412,3 +407,5 @@ app.get('/orders', async (c) => {
 });
 
 export default app;
+
+

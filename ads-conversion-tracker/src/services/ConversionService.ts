@@ -43,6 +43,13 @@ export interface GetConfirmedConversionsRequest {
   end_date?: string | null;
 }
 
+export interface ConversionEventsResult {
+  found: boolean;
+  conversion_id?: string;
+  events_payload?: any[];
+  events_count?: number;
+}
+
 export class ConversionService {
   private static normalizeBaseUrl(url?: string) {
     if (!url) return '';
@@ -162,16 +169,21 @@ export class ConversionService {
           LIMIT 1
         ) l ON true
         JOIN LATERAL (
-          SELECT r.last_conversion
+          SELECT r.first_conversion, r.last_conversion
           FROM rdstation_webhook_logs r
           WHERE r.email IS NOT NULL
             AND LOWER(r.email) = cv.email_key
           ORDER BY COALESCE(r.updated_at, r.received_at) DESC, r.id DESC
           LIMIT 1
         ) rd ON true
-        WHERE rd.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-          AND rd.last_conversion->'conversion_origin'->>'campaign' <> ''
-          AND rd.last_conversion->'conversion_origin'->>'campaign' <> '(not set)'
+        WHERE (
+            NULLIF(TRIM(rd.last_conversion->'conversion_origin'->>'campaign'), '') IS NOT NULL
+            OR NULLIF(TRIM(rd.first_conversion->'conversion_origin'->>'campaign'), '') IS NOT NULL
+          )
+          AND COALESCE(
+            NULLIF(TRIM(rd.last_conversion->'conversion_origin'->>'campaign'), ''),
+            NULLIF(TRIM(rd.first_conversion->'conversion_origin'->>'campaign'), '')
+          ) <> '(not set)'
         LIMIT $1
       ),
       inserted AS (
@@ -239,7 +251,7 @@ export class ConversionService {
           LIMIT 1
         ) l ON true
         JOIN LATERAL (
-          SELECT r.last_conversion
+          SELECT r.first_conversion, r.last_conversion
           FROM rdstation_webhook_logs r
           WHERE r.email IS NOT NULL
             AND v."EntregaEmail" IS NOT NULL
@@ -252,9 +264,14 @@ export class ConversionService {
           AND v."EntregaEmail" IS NOT NULL
           AND TRIM(v."EntregaEmail") <> ''
           AND NOT (v."EntregaEmail" ILIKE ANY (ARRAY['%@mercadolivre.com%', '%@shopee.com%', '%@marketplace.amazon.com.br%']))
-          AND rd.last_conversion->'conversion_origin'->>'campaign' IS NOT NULL
-          AND rd.last_conversion->'conversion_origin'->>'campaign' <> ''
-          AND rd.last_conversion->'conversion_origin'->>'campaign' <> '(not set)'
+          AND (
+            NULLIF(TRIM(rd.last_conversion->'conversion_origin'->>'campaign'), '') IS NOT NULL
+            OR NULLIF(TRIM(rd.first_conversion->'conversion_origin'->>'campaign'), '') IS NOT NULL
+          )
+          AND COALESCE(
+            NULLIF(TRIM(rd.last_conversion->'conversion_origin'->>'campaign'), ''),
+            NULLIF(TRIM(rd.first_conversion->'conversion_origin'->>'campaign'), '')
+          ) <> '(not set)'
       ) x
     `);
 
@@ -335,43 +352,25 @@ export class ConversionService {
     let paramIndex = 1;
 
     if (startDate) {
-      whereClause += ` AND c.data_venda::date >= $${paramIndex}::date`;
+      whereClause += ` AND v.data_venda::date >= $${paramIndex}::date`;
       queryParams.push(startDate);
       paramIndex++;
     }
 
     if (endDate) {
-      whereClause += ` AND c.data_venda::date <= $${paramIndex}::date`;
+      whereClause += ` AND v.data_venda::date <= $${paramIndex}::date`;
       queryParams.push(endDate);
       paramIndex++;
     }
 
-    let countSearchClause = '';
-    let rowsSearchClause = '';
+    let searchClause = '';
     if (search) {
-      countSearchClause = `
+      searchClause = `
         AND (
-          c.codigo_venda ILIKE $${paramIndex}
-          OR l.email ILIKE $${paramIndex}
-          OR EXISTS (
-            SELECT 1
-            FROM rdstation_webhook_logs r
-            WHERE l.email IS NOT NULL
-              AND r.email IS NOT NULL
-              AND LOWER(r.email) = LOWER(l.email)
-              AND (
-                r.last_conversion->'conversion_origin'->>'campaign' ILIKE $${paramIndex}
-                OR r.last_conversion->'conversion_origin'->>'source' ILIKE $${paramIndex}
-              )
-          )
-        )
-      `;
-      rowsSearchClause = `
-        AND (
-          c.codigo_venda ILIKE $${paramIndex}
-          OR l.email ILIKE $${paramIndex}
-          OR rd.utm_campaign ILIKE $${paramIndex}
-          OR rd.origem ILIKE $${paramIndex}
+          v.codigo_venda ILIKE $${paramIndex}
+          OR v.lead_email ILIKE $${paramIndex}
+          OR v.utm_campaign ILIKE $${paramIndex}
+          OR v.origem ILIKE $${paramIndex}
         )
       `;
       queryParams.push(`%${search}%`);
@@ -381,43 +380,34 @@ export class ConversionService {
     const [totalResult, rowsResult] = await Promise.all([
       query<{ total: string }>(
         `SELECT COUNT(*)::text AS total
-         FROM conversoes c
-         JOIN leads l ON l.id = c.lead_id
+         FROM vw_conversoes_confirmadas v
          ${whereClause}
-         ${countSearchClause}`,
+         ${searchClause}`,
         queryParams
       ),
       query(
         `SELECT
-          c.id AS conversao_id,
-          c.codigo_venda,
-          c.valor_venda,
-          c.data_venda,
-          c.canal,
-          c.created_at,
-          c.google_ads_enviado,
-          c.meta_ads_enviado,
-          l.id AS lead_id,
-          l.email AS lead_email,
-          l.status AS lead_status,
-          rd.utm_campaign,
-          rd.origem
-        FROM conversoes c
-        JOIN leads l ON l.id = c.lead_id
-        LEFT JOIN LATERAL (
-          SELECT
-            r.last_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
-            r.last_conversion->'conversion_origin'->>'source' AS origem
-          FROM rdstation_webhook_logs r
-          WHERE l.email IS NOT NULL
-            AND r.email IS NOT NULL
-            AND LOWER(r.email) = LOWER(l.email)
-          ORDER BY COALESCE(r.updated_at, r.received_at) DESC, r.id DESC
-          LIMIT 1
-        ) rd ON true
+          v.conversao_id,
+          v.codigo_venda,
+          v.valor_venda,
+          v.data_venda,
+          v.canal,
+          v.created_at,
+          c.events_payload,
+          jsonb_array_length(COALESCE(c.events_payload, '[]'::jsonb)) AS events_count,
+          v.google_ads_enviado,
+          v.meta_ads_enviado,
+          v.lead_id,
+          v.lead_email,
+          v.lead_status,
+          v.utm_campaign,
+          v.origem
+        FROM vw_conversoes_confirmadas v
+        INNER JOIN conversoes c
+          ON c.id = v.conversao_id
         ${whereClause}
-        ${rowsSearchClause}
-        ORDER BY c.data_venda DESC NULLS LAST, c.created_at DESC
+        ${searchClause}
+        ORDER BY v.data_venda DESC NULLS LAST, v.created_at DESC
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
         [...queryParams, limit, offset]
       )
@@ -433,6 +423,29 @@ export class ConversionService {
       total,
       total_pages: totalPages,
       rows: rowsResult.rows
+    };
+  }
+
+  static async getConversionEvents(conversionId: string): Promise<ConversionEventsResult> {
+    const result = await query<{ id: string; events_payload: any }>(
+      `SELECT id, COALESCE(events_payload, '[]'::jsonb) AS events_payload
+       FROM conversoes
+       WHERE id = $1
+       LIMIT 1`,
+      [conversionId]
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return { found: false };
+    }
+
+    const payload = Array.isArray(row.events_payload) ? row.events_payload : [];
+    return {
+      found: true,
+      conversion_id: row.id,
+      events_payload: payload,
+      events_count: payload.length
     };
   }
 

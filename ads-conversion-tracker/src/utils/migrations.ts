@@ -236,10 +236,8 @@ export async function runAutoMigrations(): Promise<void> {
         l.id AS lead_id,
         l.email AS lead_email,
         l.status AS lead_status,
-        -- Compat: mantém os nomes antigos apontando para last_conversion
         rd.last_conversion->'conversion_origin'->>'campaign' AS utm_campaign,
         rd.last_conversion->'conversion_origin'->>'source' AS origem,
-        -- Campos explícitos para seleção dinâmica (first/last) na query consumidora
         rd.first_conversion->'conversion_origin'->>'campaign' AS first_utm_campaign,
         rd.first_conversion->'conversion_origin'->>'source' AS first_origem,
         rd.last_conversion->'conversion_origin'->>'campaign' AS last_utm_campaign,
